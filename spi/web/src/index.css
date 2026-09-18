@@ -1,0 +1,1035 @@
+/* =========================================================================
+   SISTEMA DE DISEÑO - MODERN TECHNICAL / DENSE MINIMALIST (LINEAR/VERCEL STYLE)
+   ========================================================================= */
+:root {
+  /* Fondo zinc y gris neutro ultra-oscuro de producción */
+  --bg-primary: #09090b;      /* Zinc 950 */
+  --bg-secondary: #09090b;    /* Zinc 950 */
+  --bg-tertiary: #18181b;     /* Zinc 900 */
+  
+  /* Acentos de estado minimalistas de alta resolución */
+  --accent-blue: #fafafa;     /* Blanco puro para botones de acción primarios */
+  --accent-cyan: #38bdf8;     /* Celeste Sky para estados de red y enlaces activos */
+  --accent-glow: transparent; /* No glows difusos */
+  
+  /* Escala tipográfica compacta de texto */
+  --text-main: #f4f4f5;       /* Zinc 100 */
+  --text-muted: #71717a;      /* Zinc 500 */
+  --text-dark: #18181b;       /* Zinc 900 (para contraste en botones blancos) */
+  
+  /* Geometría técnica rectilínea de 1px */
+  --border-color: #27272a;    /* Zinc 800 */
+  --border-active: #3f3f46;   /* Zinc 700 */
+  --border-glow: transparent;
+  
+  /* Semántica de infraestructura */
+  --success: #22c55e;         /* Green 500 */
+  --warning: #eab308;         /* Yellow 500 */
+  --danger: #ef4444;          /* Red 500 */
+  
+  /* Layout y Grillas compactas */
+  --sidebar-width: 220px;     /* Más esbelto */
+  --border-radius: 0px;       /* RECTAS ABSOLUTAS */
+  
+  /* Fuentes de ingeniería */
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Consolas, monospace;
+  --transition: all 0.12s ease;
+}
+
+/* =========================================================================
+   SISTEMA DE DISEÑO - MODO CLARO (LIGHT MODE OVERRIDES)
+   ========================================================================= */
+:root.light-mode {
+  --bg-primary: #E3EEE6;      /* Fondo General: Verde Pastel Sage solicitado por el usuario */
+  --bg-secondary: #ffffff;    /* Paneles, tarjetas y barra lateral: Blanco Puro (Alto Contraste y relieve) */
+  --bg-tertiary: #f1f6f2;     /* Fondo de elementos/inputs secundarios y hover: Sage-Blanco suave */
+  
+  --accent-blue: #0d1711;     /* Botón de acción primario oscuro carbón-bosque */
+  --accent-cyan: #0284c7;     /* Sky 600 celeste claro */
+  
+  --text-main: #0d1711;       /* Texto Principal: Ultra carbón-bosque (Contraste Máximo y súper nítido) */
+  --text-muted: #3d4f45;      /* Texto Secundario/Subtítulos: Pizarra-bosque profundo (100% Legible y WCAG compliant) */
+  --text-dark: #ffffff;       /* Contraste de texto claro */
+  
+  --border-color: #b8cfc1;    /* Bordes de división: Tonalidad sage media más definida para delimitar elementos */
+  --border-active: #426b52;   /* Bordes de enfoque activos: Verde pino profundo nítido */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: var(--font-inter);
+  font-size: 13px; /* Compacto por defecto */
+  overflow-x: hidden;
+  min-height: 100vh;
+  display: flex;
+  letter-spacing: -0.1px;
+}
+
+#root {
+  display: flex;
+  width: 100vw;
+  min-height: 100vh;
+}
+
+/* Scrollbars técnicas planas estilo dev-console */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 0px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-active);
+}
+
+/* =========================================================================
+   LAYOUT ESTRUCTURAL COMPACTO (ZINC SHARP GRID)
+   ========================================================================= */
+aside {
+  width: var(--sidebar-width);
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px; /* Reducción de padding */
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-left: 4px;
+}
+
+.logo-icon {
+  width: 22px;
+  height: 22px;
+  background: var(--text-main);
+  border-radius: 0px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--text-dark);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.logo-text {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.3px;
+  color: var(--text-main);
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-grow: 1;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: 0px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid transparent;
+  background: none;
+  text-align: left;
+  width: 100%;
+  outline: none;
+}
+
+.nav-link:hover {
+  color: var(--text-main);
+  background-color: var(--bg-tertiary);
+}
+
+.nav-link.active {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.logout-btn:hover {
+  background-color: rgba(239, 68, 68, 0.08) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+.footer-brand {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 10px 4px 0 4px;
+  border-top: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+}
+
+main {
+  margin-left: var(--sidebar-width);
+  flex-grow: 1;
+  padding: 20px 24px; /* Reducción de márgenes y paddings globales */
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  /* Cuadrícula de ingeniería sutil gris de fondo */
+  background-size: 24px 24px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.005) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.005) 1px, transparent 1px);
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+}
+
+h1 {
+  font-size: 18px;
+  text-transform: none; /* No grita */
+}
+
+h2 {
+  font-size: 15px;
+}
+
+h3 {
+  font-size: 13px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.sys-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--success);
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--success);
+  border-radius: 0px;
+  animation: pulse 2s infinite;
+}
+
+/* =========================================================================
+   TARJETAS DE MÉTRICAS COMPACTAS (DENSE KPIS)
+   ========================================================================= */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0px;
+  padding: 12px 16px;
+  transition: var(--transition);
+}
+
+.metric-card:hover {
+  border-color: var(--border-active);
+}
+
+.metric-card::before {
+  display: none; /* Eliminar barras de color invasivas */
+}
+
+.metric-title {
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-weight: 400;
+}
+
+.metric-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-main);
+  font-family: var(--font-mono); /* Números monoespaciados técnicos */
+  letter-spacing: -0.5px;
+}
+
+/* =========================================================================
+   PANELES Y TARJETA-CARD RECTILÍNEA
+   ========================================================================= */
+.panel, .panel-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: none; /* Sin sombras difusas */
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+
+.panel-title {
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-title h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 1024px) {
+  .grid-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================================
+   BOTONES RECTOS, SECOS Y TÉCNICOS (LINEAR STYLE)
+   ========================================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 0px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none; /* Elegante Sentence-Case */
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid var(--border-color);
+  font-family: var(--font-inter);
+  outline: none;
+  background: none;
+  color: var(--text-main);
+}
+
+.btn-primary {
+  background-color: var(--accent-blue);
+  color: var(--text-dark);
+  border-color: var(--accent-blue);
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background-color: #e4e4e7;
+  border-color: #e4e4e7;
+}
+
+.btn-secondary {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-active);
+}
+
+.btn-danger {
+  background-color: rgba(239, 68, 68, 0.04);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}
+
+.btn-danger:hover {
+  background-color: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.btn-warning {
+  background-color: rgba(234, 179, 8, 0.04);
+  border-color: rgba(234, 179, 8, 0.2);
+  color: var(--warning);
+}
+
+.btn-warning:hover {
+  background-color: var(--warning);
+  color: var(--text-dark);
+  border-color: var(--warning);
+}
+
+.btn-success {
+  background-color: rgba(34, 197, 150, 0.04);
+  border-color: rgba(34, 197, 150, 0.2);
+  color: var(--success);
+}
+
+.btn-success:hover {
+  background-color: var(--success);
+  color: var(--text-dark);
+  border-color: var(--success);
+}
+
+.btn-icon {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  border-radius: 0px;
+}
+
+.btn-icon:hover {
+  color: var(--text-main);
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-active);
+}
+
+.btn-small {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+/* =========================================================================
+   TABLAS HIGH-DENSITY (CON DATOS MONOESPACIADOS)
+   ========================================================================= */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px; /* Más compacto */
+}
+
+th {
+  background-color: var(--bg-tertiary);
+  padding: 8px 12px; /* paddings súper reducidos */
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-color);
+  text-transform: none; /* No grita */
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+td {
+  padding: 8px 12px; /* Información densa */
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  /* Todo dato identificatorio, IP, MAC, fecha, número y estado tiene monoespaciado */
+  font-family: var(--font-inter);
+}
+
+/* Forzar fuentes monoespaciadas técnicas en celdas de red y códigos */
+td:nth-child(n) {
+  /* Detección automática en React a través de clases específicas de abajo */
+}
+
+.tech-mono, 
+td.mac, td.ip, td.date, td.id, td.code, td.number,
+.console-output, .file-meta, select, input, option {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  letter-spacing: -0.2px;
+}
+
+tr:hover td {
+  background-color: rgba(255, 255, 255, 0.015);
+}
+
+/* Badges minimalistas planos */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 0px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+}
+
+.badge-active {
+  background-color: rgba(34, 197, 94, 0.05);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: var(--success);
+}
+
+.badge-suspended {
+  background-color: rgba(234, 179, 8, 0.05);
+  border-color: rgba(234, 179, 8, 0.2);
+  color: var(--warning);
+}
+
+.badge-stock {
+  background-color: rgba(56, 189, 248, 0.05);
+  border-color: rgba(56, 189, 248, 0.2);
+  color: var(--accent-cyan);
+}
+
+.badge-danger {
+  background-color: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.badge-neutral {
+  background-color: rgba(113, 113, 122, 0.05);
+  border-color: rgba(113, 113, 122, 0.2);
+  color: #a1a1aa;
+}
+
+/* =========================================================================
+   FORMULARIOS PLANOS COMPACTOS (ZINC DENSE)
+   ========================================================================= */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group-full {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+input, select, textarea {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 0px;
+  padding: 6px 10px; /* Reducción a la mitad del padding */
+  color: var(--text-main);
+  font-family: var(--font-mono); /* Tipografía técnica */
+  font-size: 12px;
+  outline: none;
+  transition: var(--transition);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--border-active);
+  background-color: var(--bg-tertiary);
+  box-shadow: none; /* No sombras difusas */
+}
+
+input::placeholder, textarea::placeholder {
+  color: #3f3f46; /* Zinc 700 */
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon svg {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+}
+
+.input-with-icon input {
+  padding-left: 32px;
+  width: 100%;
+}
+
+/* Búsqueda */
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 300px;
+  width: 100%;
+}
+
+.search-box svg {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-box input {
+  padding-left: 30px;
+  width: 100%;
+  font-size: 12px;
+}
+
+/* =========================================================================
+   COMPILADOR DE BOOTFILES (CONSOLE INTERFACE)
+   ========================================================================= */
+.compiler-container {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .compiler-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.editor-textarea {
+  width: 100%;
+  height: 380px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  background-color: #050507;
+  border: 1px solid var(--border-color);
+  color: #a5f3fc; /* Celeste técnico */
+  resize: none;
+  padding: 14px;
+  box-shadow: none;
+}
+
+.editor-textarea:focus {
+  border-color: var(--border-active);
+  box-shadow: none;
+}
+
+.console-output {
+  background-color: #050507;
+  border: 1px solid var(--border-color);
+  border-radius: 0px;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  height: 140px;
+  overflow-y: auto;
+  color: #d4d4d8;
+  margin-top: 12px;
+  border-left: 2px solid var(--accent-cyan);
+}
+
+.console-line {
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.console-success { color: var(--success); }
+.console-error { color: var(--danger); }
+.console-warn { color: var(--warning); }
+.console-info { color: var(--accent-cyan); }
+
+.file-list-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0px;
+  padding: 12px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.file-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.file-name {
+  font-weight: 400;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+}
+
+.file-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* =========================================================================
+   ACCIONES MASIVAS
+   ========================================================================= */
+.bulk-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .bulk-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bulk-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+/* =========================================================================
+   TOASTS DE NOTIFICACIONES (MINIMALIST FLAT)
+   ========================================================================= */
+.notification-toast {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  box-shadow: none;
+  border-radius: 0px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 10000;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 0.2s ease-out;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.notification-toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.notification-toast.error {
+  border-color: var(--danger);
+  color: #fca5a5;
+}
+
+.notification-toast.success {
+  border-color: var(--success);
+  color: #86efac;
+}
+
+/* =========================================================================
+   REORGANIZACIÓN ESTRUCTURAL - SELECTOR DE MÓDULOS & ACENTOS DINÁMICOS
+   ========================================================================= */
+
+/* Contenedor del selector de módulos */
+.mode-selector-wrapper {
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+.mode-selector-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.mode-selector-switch {
+  display: flex;
+  background-color: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  padding: 2px;
+  position: relative;
+  width: 100%;
+  gap: 2px;
+}
+
+.mode-selector-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  outline: none;
+}
+
+.mode-selector-btn:hover {
+  color: var(--text-main);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.mode-selector-btn.active {
+  color: var(--text-main);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  font-weight: 700;
+}
+
+/* Acentos dinámicos e indicadores según el modo activo en la app */
+.mode-diagnostics .mode-selector-btn.active {
+  border-bottom: 2px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.mode-management .mode-selector-btn.active {
+  border-bottom: 2px solid #818cf8; /* Acento púrpura premium */
+  color: #818cf8;
+}
+
+
+/* Elementos visuales dinámicos por modo */
+.mode-diagnostics aside {
+  border-right: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.mode-management aside {
+  border-right: 1px solid rgba(129, 140, 248, 0.2);
+}
+
+/* Modificadores de la cabecera */
+.module-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-radius: 0px;
+}
+
+.module-badge-diagnostics {
+  background-color: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--accent-cyan);
+}
+
+.module-badge-management {
+  background-color: rgba(129, 140, 248, 0.08);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  color: #818cf8;
+}
+
+/* Sección de la barra lateral */
+.sidebar-section-header {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 14px 4px 6px 4px;
+}
+
+/* Animaciones sutiles de entrada */
+.animate-slide-up {
+  animation: slideUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* =========================================================================
+   SISTEMA DE SUB-PESTAÑAS INTERNAS & ELEMENTOS SELECT
+   ========================================================================= */
+
+.sub-tabs-container {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 24px;
+  gap: 16px;
+  width: 100%;
+}
+
+.sub-tab-btn {
+  background: none;
+  border: none;
+  padding: 8px 12px 10px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease-in-out;
+  outline: none;
+}
+
+.sub-tab-btn:hover {
+  color: var(--text-main);
+}
+
+.sub-tab-btn.active {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.sub-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--accent-blue);
+  transition: all 0.15s ease-in-out;
+}
+
+/* Indicadores de sub-pestañas coloreados contextualmente según el modo global */
+.mode-diagnostics .sub-tab-btn.active::after {
+  background-color: var(--accent-cyan);
+}
+
+.mode-management .sub-tab-btn.active::after {
+  background-color: #818cf8;
+}
+
+/* Estilización Premium de Elementos Select (Rectas absolutas, monoespacio) */
+.premium-select {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  cursor: pointer;
+  transition: var(--transition);
+  border-radius: 0px;
+}
+
+.premium-select:focus {
+  border-color: var(--accent-blue);
+}
+
+.mode-diagnostics .premium-select:focus {
+  border-color: var(--accent-cyan);
+}
+
+.mode-management .premium-select:focus {
+  border-color: #818cf8;
+}
+
+

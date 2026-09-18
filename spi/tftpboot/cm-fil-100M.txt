@@ -1,0 +1,14 @@
+Main {
+    NetworkAccess 1;
+    MaxClassifiers 4;
+    
+    UsPacketClass {
+        ClassId 1;
+        MaxRateSustained 15360000; /* 15 Mbps Upstream */
+    }
+    
+    DsPacketClass {
+        ClassId 2;
+        MaxRateSustained 102400000; /* 100 Mbps Downstream */
+    }
+}

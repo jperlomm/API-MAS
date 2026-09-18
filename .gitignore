@@ -1,0 +1,68 @@
+# =============================================================================
+# SPI MAS - ARCHIVO .GITIGNORE DE PRODUCCIÓN
+# =============================================================================
+
+# --- Carpetas de Respaldo Histórico / Sandboxes (Exclusión Crítica) ---
+spiOLD/
+smi/
+DHCP/
+Docker/
+POSTREGRES LEGACY/
+Postgres/
+
+# --- Credenciales y Datos Sensibles ---
+.env
+*.env
+*.pem
+*.key
+.ssh/
+*private*
+
+# --- Datos Locales de Contenedores y Base de Datos ---
+postgres_data/
+spi/postgres_data/
+backups/
+spi/backups/
+tftpboot/*
+!tftpboot/cm-fil-100M.txt
+
+# --- Excluir Backups y Volúmenes Pesados ---
+*.sql.gz
+*.tar.gz
+*.backup
+*.dump
+
+# --- Mantener Scripts de Inicialización Específicos ---
+!postgres_migration_complete.sql
+!create_table.sql
+!test_verification.sql
+
+# --- Node.js / React (web) ---
+node_modules/
+spi/web/node_modules/
+dist/
+spi/web/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.vite/
+
+# --- .NET Core (api) ---
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# --- IDEs y Sistema Operativo ---
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

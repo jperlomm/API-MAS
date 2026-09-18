@@ -1,0 +1,218 @@
+services:
+  # 0. INICIALIZADOR AUTOMATICO (Extrae el esquema oficial de Kea antes de iniciar Postgres)
+  db-init-helper:
+    build:
+      context: ./kea
+      dockerfile: Dockerfile
+    container_name: isp-db-init-helper
+    volumes:
+      - ./postgres/initdb:/initdb
+    command: cp /usr/share/kea/scripts/pgsql/dhcpdb_create.pgsql /initdb/01_kea_dhcp.sql
+
+  # 1. MOTOR DE BASE DE DATOS (Almacena administración y Kea DHCP)
+  # Guardamos los datos físicamente en ./postgres_data para aprovechar la partición /home con 33GB libres
+  postgres:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    container_name: isp-postgres
+    restart: unless-stopped
+    depends_on:
+      db-init-helper:
+        condition: service_completed_successfully
+    environment:
+      - ISP_NAME=${ISP_NAME}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST_AUTH_METHOD=md5
+      - PGDATA=/var/lib/postgresql/data
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d
+    network_mode: host
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=$$POSTGRES_PASSWORD psql -U postgres -d dhcp -c 'SELECT 1 FROM schema_version LIMIT 1;'"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+  # 2. MOTOR DHCP DE KEA (Corre en modo host para recibir peticiones broadcast)
+  kea-dhcp:
+    build:
+      context: ./kea
+      dockerfile: Dockerfile
+    container_name: isp-kea-dhcp
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./kea:/etc/kea
+      - /var/run/kea:/var/run/kea
+    network_mode: host
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep kea-dhcp4 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+  # 3. API REST DE ADMINISTRACION (Interconecta tu panel con la base de datos)
+  admin-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: isp-admin-api
+    user: "0"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=Host=127.0.0.1;Port=5432;Database=${POSTGRES_DB};Username=postgres;Password=${POSTGRES_PASSWORD}
+      - TFTP_DIRECTORY=/app/tftp
+      - INFRA_SERVER_IP=192.168.2.106
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - SNMP_COMMUNITY=${SNMP_COMMUNITY}
+    volumes:
+      - ./tftpboot:/app/tftp
+      - ./kea:/app/kea
+      - /var/run/kea:/var/run/kea:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./backups:/app/backups:ro
+    network_mode: host
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+  # 4. SERVIDOR TFTP INDUSTRIAL DE ALTO RENDIMIENTO (Entrega bootfiles .bin)
+  tftp:
+    image: debian:bookworm-slim
+    container_name: isp-tftp
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./tftpboot:/tftpboot:ro
+    # Instalar el servidor tftpd-hpa oficial y correrlo en primer plano (foreground)
+    # en modo seguro apuntando a /tftpboot
+    command: >
+      bash -c "apt-get update && apt-get install -y tftpd-hpa &&
+               exec in.tftpd --foreground --secure --user tftp /tftpboot"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q in.tftpd /proc/1/comm || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+
+  # 5. INTERFAZ WEB DESACOPLADA (React + Vite + TS servida por Nginx en modo host)
+  web-client:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: isp-web-client
+    restart: unless-stopped
+    depends_on:
+      - admin-api
+    network_mode: host
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+  # 6. SERVIDOR TIME-OF-DAY (ToD - RFC 868) LOCAL DE ALTO RENDIMIENTO
+  tod:
+    image: python:3.11-slim
+    container_name: isp-tod
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./tod:/app
+    command: python /app/tod_server.py
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q tod_server.py /proc/1/cmdline || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+
+  # 7. GESTOR DE RESPALDOS Y AUDITORÍA SRE (Automatiza backups, verificación en caliente y replicación)
+  backup-manager:
+    build:
+      context: ./backup-manager
+      dockerfile: Dockerfile
+    container_name: isp-backup-manager
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    network_mode: host
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - BACKUP_REMOTE_HOST=${BACKUP_REMOTE_HOST}
+      - BACKUP_REMOTE_USER=${BACKUP_REMOTE_USER}
+      - BACKUP_REMOTE_PATH=${BACKUP_REMOTE_PATH}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    volumes:
+      # Socket de Docker para poder crear y destruir el Postgres temporal de verificación
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mapeo de la carpeta de backups para persistencia local
+      - ./backups:/opt/backups
+      # Mapeo del código de scripts de backup
+      - ./backups_system:/opt/backups_system
+      # Montaje de la clave SSH para SCP/rsync remota
+      - /home/usuario/.ssh:/root/.ssh:ro
+      # Montaje del directorio completo del proyecto para respaldar configs (.tar.gz)
+      - .:/app/project:ro
+    entrypoint: >
+      sh -c "chmod +x /opt/backups_system/*.sh &&
+             /opt/backups_system/watchdog.sh &
+             echo '0 3 * * * /opt/backups_system/backup_and_verify.sh >> /var/log/backup.log 2>&1' > /etc/crontabs/root &&
+             exec crond -f -l 2"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
