@@ -1,6 +1,6 @@
-# 🐋 DEPLOYMENT BLUEPRINT: PROXMOX VE + DEBIAN 12 CLOUD-INIT (MULTI-DISK)
+# 🐋 DEPLOYMENT BLUEPRINT: PROXMOX VE + DEBIAN 12 CLOUD-INIT (100% AUTOMATIZADO)
 ---
-Esta guía detalla la implementación paso a paso de la **Opción B**: una máquina virtual Debian 12 en Proxmox VE aprovisionada de forma 100% automatizada mediante **Cloud-Init** (utilizando el archivo `cloud_init_user_data.yaml` para instalar Docker) y segmentada con **múltiples discos virtuales independientes** para garantizar la seguridad, el aislamiento y el máximo rendimiento de la base de datos de producción.
+Esta guía detalla el aprovisionamiento de infraestructura como código (IaC) de **SPI MAS**: una máquina virtual Debian 12 en Proxmox VE con **múltiples discos virtuales independientes** y motores de Docker listos, todo automatizado mediante scripts para reducir tu trabajo manual a **literalmente un solo comando**.
 
 ---
 
@@ -14,7 +14,7 @@ Esta guía detalla la implementación paso a paso de la **Opción B**: una máqu
 
 ---
 
-## 🛠️ PASO 1: DESCARGAR Y PREPARAR LA PLANTILLA EN PROXMOX VE (CLI)
+## 🛠️ PASO 1: CREAR LA PLANTILLA BASE EN EL PROXMOX FISICO (CLI)
 
 Ejecuta estos comandos directamente desde la **consola SSH física de tu servidor Proxmox VE** (como usuario `root` de Proxmox) para descargar la imagen oficial de Debian y convertirla en una plantilla reutilizable.
 
@@ -62,12 +62,12 @@ qm set 9000 --serial0 socket --vga serial0
 
 ---
 
-## 🚀 PASO 2: VINCULAR EL ARCHIVO CLOUD-INIT AUTOMATIZADO
+## 🚀 PASO 2: VINCULAR LA AUTOMATIZACIÓN DE CLOUD-INIT
 
-Para que la máquina virtual instale automáticamente Docker y habilite el acceso por SSH con contraseña en su primer arranque, debemos vincular el archivo `cloud_init_user_data.yaml` que creamos:
+Para que todas las VMs que clones instalen automáticamente Docker, habiliten SSH con contraseña, formateen y monten las particiones adicionales en el primer arranque, asociamos nuestro archivo `cloud_init_user_data.yaml`:
 
 1. **Subir el archivo de automatización a Proxmox:**
-   Copia el contenido de tu archivo local `docs/cloud_init_user_data.yaml` y guárdalo en tu servidor Proxmox físico como un archivo en la ruta de fragmentos de código (*Snippets*):
+   Copia el contenido de tu archivo local `docs/cloud_init_user_data.yaml` y guárdalo en tu servidor Proxmox físico en la ruta de fragmentos de código (*Snippets*):
    `/var/lib/vz/snippets/cloud_init_user_data.yaml`
 
 2. **Asociar el archivo a la plantilla `9000`:**
@@ -77,100 +77,54 @@ Para que la máquina virtual instale automáticamente Docker y habilite el acces
    ```
 
 3. **Convertir la VM en una Plantilla inmutable:**
-   Ahora que la plantilla tiene la automatización de Docker y SSH vinculada, conviértela en plantilla:
    ```bash
    qm template 9000
    ```
 
 ---
 
-## 👥 PASO 3: CLONACIÓN Y CONFIGURACIÓN GRÁFICA EN PROXMOX
+## 🤖 PASO 3: CREAR NUEVOS SERVIDORES CON UN SOLO COMANDO (PROXMOX CLI)
 
-Cada vez que necesites crear un nuevo servidor de producción (ej: tu máquina de producción ID `150` con nombre `spi-prod`):
+Hemos automatizado toda la clonación, configuración de IP, contraseñas y asignación de discos a través del script **`create_spi_server.sh`**. 
 
-1. Haz clic derecho sobre la plantilla `debian12-cloud-template` (`9000`) y selecciona **Clone**.
-   * Modo: **Full Clone**.
-   * ID: **150** (o el que desees).
-   * Nombre: **spi-prod**.
-2. Selecciona la nueva VM `150` y ve a la pestaña **Cloud-Init**:
-   * **User:** `usuario`
-   * **Password:** Escribe la contraseña de administrador que desees. (Proxmox la inyectará automáticamente en el sistema de forma segura).
-   * **IP Config:** Configura tu IP estática real de producción (ej: `192.168.2.106/24` con gateway `192.168.2.1`).
-   * Haz clic en el botón **Regenerate Image** para aplicar los cambios.
+1. Copia el archivo `docs/create_spi_server.sh` a tu servidor Proxmox físico como `/root/create_spi_server.sh`.
+2. Dale permisos de ejecución:
+   ```bash
+   chmod +x /root/create_spi_server.sh
+   ```
+3. **Ejecuta el script para aprovisionar un servidor entero en 1 segundo:**
+   ```bash
+   # Sintaxis: ./create_spi_server.sh <ID_DE_VM> <IP/SUBNET> <GATEWAY> <CONTRASEÑA>
+   /root/create_spi_server.sh 150 "192.168.2.106/24" "192.168.2.1" "mi_clave_secreta_123"
+   ```
 
----
-
-## 💾 PASO 4: CREAR Y ADJUNTAR LOS DISCOS SECUNDARIOS Y TERCIARIOS
-
-Desde la sección de **Hardware** de la nueva VM clonada (`150`) en Proxmox, o mediante SSH en Proxmox VE, agregamos los discos adicionales físicos antes de iniciar la VM por primera vez.
-
-```bash
-# Agregar un disco SCSI1 de 40 GB para Docker (en almacenamiento rápido local-lvm)
-qm set 150 --scsi1 local-lvm:40,discard=on,ssd=1
-
-# Agregar un disco SCSI2 de 20 GB para Backups (en almacenamiento seguro)
-qm set 150 --scsi2 local-lvm:20,discard=on,ssd=1
-```
+El script se encargará de clonar la plantilla, inyectar la red/contraseña, crear y adjuntar los discos SCSI1 (40GB) y SCSI2 (20GB), y arrancar la máquina virtual de inmediato.
 
 ---
 
-## 🏁 PASO 5: ARRANQUE, FORMATEO Y AUTOMONTAJE PERSISTENTE
+## 🏁 PASO 4: INGRESAR Y DESPLEGAR EL SISTEMA (CERO TRABAJO MANUAL)
 
-1. Enciende la máquina virtual `150` desde la interfaz de Proxmox.
-2. Espera unos **2 o 3 minutos** mientras el sistema se inicializa por primera vez. Cloud-Init se encargará en segundo plano de:
-   * Crear el usuario, actualizar el SO y habilitar SSH por contraseña.
-   * Instalar dependencias, descargar llaves GPG de Docker, agregar el repositorio e **instalar Docker Engine + Docker Compose v2 de forma nativa**.
-   * Configurar los permisos de usuario del grupo `docker`.
-3. Conéctate por SSH desde tu terminal utilizando tu contraseña:
+1. Enciende la VM (el script lo hace por ti) y **espera de 2 a 3 minutos** en tu pantalla sin tocar nada.
+2. En ese primer booteo, **la VM Debian se auto-configurará de forma silenciosa**:
+   * Formateará los discos secundarios SCSI1 y SCSI2 en `ext4`.
+   * Los montará de forma persistente en `/var/lib/docker` y `/backups` y escribirá las entradas correspondientes en `/etc/fstab`.
+   * Agregará las llaves GPG, repositorios oficiales e **instalará Docker Engine + Docker Compose v2 directamente sobre el almacenamiento rápido**.
+   * Configurará tu cuenta de SSH y los permisos del grupo `docker`.
+3. Conéctate directamente por SSH usando la contraseña que definiste:
    ```bash
    ssh usuario@192.168.2.106
    ```
+4. **Verifica que los discos estén listos y montados:**
+   ```bash
+   df -h
+   ```
+   *(Verás `/dev/sdb` montado en `/var/lib/docker` y `/dev/sdc` montado en `/backups` de forma inmediata)*.
 
-Una vez dentro, formateamos y configuramos el montaje persistente para asegurar que los motores de Docker y Postgres escriban en las particiones correctas de alta velocidad:
+5. **¡Listo! Despliega SPI MAS:**
+   Solo te queda clonar tu código de producción en el servidor y levantar tus contenedores Docker con un comando:
+   ```bash
+   # clonar tu repositorio o hacer rsync desde tu maquina local
+   cd ~/spi && docker compose up -d
+   ```
 
-### 1. Formatear las particiones con sistema de archivos `ext4`
-```bash
-# Formatear el disco SCSI1 (sdb) para Docker
-sudo mkfs.ext4 -L docker_data /dev/sdb
-
-# Formatear el disco SCSI2 (sdc) para Backups
-sudo mkfs.ext4 -L backups_data /dev/sdc
-```
-
-### 2. Obtener los identificadores únicos (UUID) de los nuevos discos
-```bash
-sudo blkid
-```
-*Identifica las líneas correspondientes a `/dev/sdb` (LABEL="docker_data") y `/dev/sdc` (LABEL="backups_data") y copia sus valores UUID.*
-
-### 3. Configurar el montaje persistente en `/etc/fstab`
-Edita el archivo de sistemas de archivos:
-```bash
-sudo nano /etc/fstab
-```
-Agrega las siguientes dos líneas al final del archivo (reemplazando los UUID por tus UUID reales):
-
-```fstab
-# Disco SCSI1 dedicado para Docker y Base de Datos (en NVMe/SSD)
-UUID=tu-uuid-de-sdb-aquí  /var/lib/docker  ext4  defaults,nofail,discard,noatime  0  2
-
-# Disco SCSI2 dedicado para Respaldos SRE (en almacenamiento de resguardo)
-UUID=tu-uuid-de-sdc-aquí  /backups         ext4  defaults,nofail,discard  0  2
-```
-
-### 4. Montar los discos y verificar
-```bash
-# Montar los discos en caliente sin reiniciar
-sudo mount -a
-
-# Verificar que quedaron montados en sus rutas respectivas
-df -h
-```
-*Deberías ver `/dev/sdb` montado en `/var/lib/docker` y `/dev/sdc` montado en `/backups`.*
-
-### 5. Reiniciar el servicio de Docker para que use el volumen de alta velocidad
-```bash
-sudo systemctl restart docker
-```
-
-¡Listo! Tu servidor está 100% aprovisionado de forma automatizada, con una arquitectura multi-disco virtual robusta y los motores de Docker activos y operando sobre SSDs rápidos.
+¡Felicidades! Tienes un sistema de aprovisionamiento automatizado e Infraestructura como Código (IaC) digno de una arquitectura corporativa moderna.
