@@ -5,7 +5,7 @@ Este manual resume el procedimiento exacto y ultra-práctico utilizado para migr
 ---
 
 ### 📋 CONFIGURACIÓN PREVIA:
-Durante la migración, tu archivo `docker-compose.yml` tiene declarado temporalmente el servicio `isp-postgres-legacy` (puerto `5433`). Una vez finalizada la migración, este servicio se comentará o eliminará del compose para dejar únicamente el motor de producción (`isp-postgres` en puerto `5432`) activo.
+Durante la migración, tu archivo `docker-compose.yml` tiene declarado temporalmente el servicio `pg_legacy_temp` en el puerto **`5435`**. Una vez finalizada la migración, este servicio se comentará o eliminará del compose para dejar únicamente el motor de producción (`isp-postgres` en puerto `5432`) activo.
 
 ---
 
@@ -20,16 +20,16 @@ scp ~/Documentos/spiOLD.sql usuario@192.168.2.107:/home/usuario/
 ---
 
 ### 💾 PASO 2: Restaurar el dump en el contenedor Legacy (Docker Exec)
-Una vez copiado el archivo, conéctate por SSH al servidor y restáuralo dentro del contenedor temporal de base de datos legacy levantado por el compose:
+Una vez copiado el archivo, conéctate por SSH al servidor y restáuralo dentro del contenedor temporal de base de datos legacy `pg_legacy_temp` (puerto `5435`):
 ```bash
-docker exec -i isp-postgres-legacy psql -U postgres -d pg_legacy_temp < /home/usuario/spiOLD.sql
+docker exec -i pg_legacy_temp psql -U postgres -d pg_legacy_temp < /home/usuario/spiOLD.sql
 ```
 
 ---
 
 ### ⚙️ PASO 3: Levantar funciones ETL y datos estructurales de bajo cambio
 Carga el script `postgres_migration_complete.sql` en tu contenedor de producción. Este paso realiza de forma automática:
-1. La conexión FDW hacia el contenedor legacy.
+1. La conexión FDW hacia el contenedor legacy (`pg_legacy_temp` en el puerto `5435`).
 2. La migración de datos fijos estructurales (Planes/servicios, subredes DHCP, cabeceras CMTS y marcas de modems) para satisfacer restricciones de Foreign Keys.
 3. El registro de la función de migración dinámica.
 
@@ -49,7 +49,7 @@ docker exec -it isp-postgres psql -U postgres -d dhcp -c "SELECT * FROM admin.mi
 
 ## 🧹 PASO FINAL: Limpieza de Producción
 Una vez que hayas migrado todos los CMTS y verificado la consistencia:
-1. Abre tu `docker-compose.yml` en el servidor y comenta o elimina el servicio de la base de datos temporal `isp-postgres-legacy`.
+1. Abre tu `docker-compose.yml` en el servidor y comenta o elimina el servicio de la base de datos temporal `pg_legacy_temp`.
 2. Reinicia tus contenedores para eliminar rastros de la base de datos temporal:
    ```bash
    docker compose up -d --remove-orphans
