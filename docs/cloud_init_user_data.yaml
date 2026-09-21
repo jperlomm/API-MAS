@@ -3,7 +3,7 @@
 # SPI MAS - PLANTILLA CLOUD-INIT AUTOMATIZADA AL 100% (USER-DATA)
 # =============================================================================
 # Este archivo realiza TODO de forma automática en el primer arranque:
-# 1. Configura el usuario con contraseña segura spi_admin_pwd_123.
+# 1. Configura el usuario con contraseña segura 11Smme27.
 # 2. Formatea y monta los discos SCSI secundarios en sus rutas correctas.
 # 3. Instala Docker Engine de forma nativa directo sobre el volumen rápido.
 # =============================================================================
@@ -18,8 +18,8 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     lock_passwd: false
-    # Contraseña en hash SHA-512 correspondiente a: spi_admin_pwd_123
-    passwd: "$6$yvfDnlp2hYOpOLzD$4FVKVPwLjmvRXTNADvxiK/BWtgGZOvjwAa.E9WfLnFiOGb5Y.kbYNKcYTvIGJVnx/AlELve9zvlM0d4PmKQ8l0"
+    # Contraseña en hash SHA-512 correspondiente a: 11Smme27
+    passwd: "$6$moJYFk4Xib4yzv72$N6xqU.yoEY8lVI93d2ri1UfxnWZUimkiErfGVdLt1N9Z5v/PpbbWLp4xlrQATfFTJfriV8n1O39FJsCfGwvGe1"
 
 # --- 2. ACTUALIZACIÓN DE REPOSITORIOS ---
 package_update: true
