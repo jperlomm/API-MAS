@@ -50,11 +50,12 @@ fi
 echo -e "\n${YELLOW}📦 1/4 Clonando plantilla $TEMPLATE_ID hacia la nueva VM $VM_ID ($VM_NAME)...${NC}"
 qm clone "$TEMPLATE_ID" "$VM_ID" --name "$VM_NAME" --full
 
-# 3. Configurar Cloud-Init (IP, Gateway, Usuario y Contraseña)
+# 3. Configurar Cloud-Init (IP, Gateway, DNS, Usuario y Contraseña)
 echo -e "\n${YELLOW}🔧 2/4 Configurando Cloud-Init de red y contraseñas...${NC}"
 qm set "$VM_ID" \
   --cipassword "$VM_PASS" \
-  --ipconfig0 "ip=${VM_IP},gw=${VM_GW}"
+  --ipconfig0 "ip=${VM_IP},gw=${VM_GW}" \
+  --nameserver "1.1.1.1 8.8.8.8"
 
 # 4. Crear e insertar discos virtuales SCSI adicionales
 echo -e "\n${YELLOW}💾 3/4 Creando y adjuntando discos segmentados independientes...${NC}"
