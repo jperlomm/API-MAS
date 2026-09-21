@@ -11,18 +11,26 @@ Durante la migración, tu archivo `docker-compose.yml` tiene declarado temporalm
 
 ## 🚀 PROCESO DE MIGRACIÓN EN 4 PASOS
 
-### 📦 PASO 1: Copiar el dump legacy al servidor (SCP)
-Desde la terminal de tu computadora local de desarrollo, copia el archivo de respaldo histórico (`spiOLD.sql` o `pg_legacy_temp.sql`) hacia la carpeta de tu usuario en el servidor Proxmox:
+### 📦 PASO 1: Copiar el dump comprimido al servidor (SCP)
+Desde la terminal de tu computadora local de desarrollo, copia tu volcado comprimido de pruebas hacia el directorio home del usuario en el servidor Proxmox:
 ```bash
-scp ~/Documentos/spiOLD.sql usuario@192.168.2.107:/home/usuario/
+scp "/home/usuario/Documentos/antigravity/SPI-V1/POSTREGRES LEGACY/spi40db.dump.gz" usuario@192.168.2.107:/home/usuario/
 ```
 
 ---
 
-### 💾 PASO 2: Restaurar el dump en el contenedor Legacy (Docker Exec)
-Una vez copiado el archivo, conéctate por SSH al servidor y restáuralo dentro del contenedor temporal de base de datos legacy `pg_legacy_temp` (puerto `5435`):
+### 💾 PASO 2: Descomprimir y restaurar el dump en el contenedor Legacy
+Conéctate por SSH a tu servidor y ejecuta la descompresión física del archivo, seguida de la inyección directa al contenedor temporal de base de datos `pg_legacy_temp` (puerto `5435`):
+
+#### 1. Descomprimir el archivo en el servidor:
 ```bash
-docker exec -i pg_legacy_temp psql -U postgres -d pg_legacy_temp < /home/usuario/spiOLD.sql
+gunzip -f /home/usuario/spi40db.dump.gz
+```
+*(Esto extraerá el archivo de texto SQL plano `/home/usuario/spi40db.dump` listo para usar).*
+
+#### 2. Restaurar la base de datos dentro del contenedor temporal:
+```bash
+docker exec -i pg_legacy_temp psql -U postgres -d pg_legacy_temp < /home/usuario/spi40db.dump
 ```
 
 ---
@@ -57,4 +65,8 @@ Una vez que hayas migrado todos los CMTS y verificado la consistencia:
 3. (Opcional) Elimina el FDW en la base de datos de producción ejecutando:
    ```bash
    docker exec -it isp-postgres psql -U postgres -d dhcp -c "DROP SCHEMA IF EXISTS legacy CASCADE; DROP SERVER IF EXISTS legacy_server CASCADE;"
+   ```
+4. Borra el archivo de dump temporal en el servidor para liberar espacio de almacenamiento:
+   ```bash
+   rm -f /home/usuario/spi40db.dump
    ```
