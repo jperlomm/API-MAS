@@ -1,0 +1,58 @@
+#cloud-config
+# =============================================================================
+# SPI MAS - PLANTILLA CLOUD-INIT (USER-DATA) PARA PROXMOX VE
+# =============================================================================
+# Este archivo automatiza la creación de usuarios, la inyección de llaves SSH,
+# la actualización del SO, la instalación de utilidades esenciales y la
+# configuración automática y silenciosa de Docker Engine + Compose v2.
+# =============================================================================
+
+# --- 1. CONFIGURACIÓN DE USUARIOS ---
+users:
+  - name: usuario
+    gecos: Usuario SPI
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: false
+    # Puedes usar tu clave SSH pública para ingresar de forma ultra segura sin contraseña
+    ssh_authorized_keys:
+      - ssh-rsa TU_CLAVE_PUBLICA_SSH_AQUÍ
+
+# --- 2. CONFIGURACIÓN DEL AGENTE Y SERVICIOS ---
+# Actualizar el sistema de paquetes al primer arranque
+package_update: true
+package_upgrade: true
+
+# --- 3. INSTALACIÓN DE PAQUETES NATIVOS DE DEBIAN (APT) ---
+packages:
+  - curl
+  - rsync
+  - htop
+  - git
+  - ca-certificates
+  - gnupg
+  - qemu-guest-agent  # Crucial: Permite a Proxmox conocer la IP de la VM y apagarla de forma limpia
+
+# --- 4. COMANDOS DE ARRANQUE (AUTOMATIZAR MONTAJES Y DOCKER) ---
+runcmd:
+  # A. Crear carpetas físicas de montaje para la estructura Multi-Disco
+  - mkdir -p /backups
+  - mkdir -p /var/lib/docker
+
+  # B. Agregar las llaves GPG y Repositorio oficial de Docker Engine
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - chmod a+r /etc/apt/keyrings/docker.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
+
+  # C. Instalar la última versión estable de Docker Engine y Docker Compose
+  - apt-get update -y
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # D. Añadir al usuario principal al grupo de Docker (para evitar escribir sudo docker ...)
+  - usermod -aG docker usuario
+
+  # E. Notificar en el log de inicio que la configuración finalizó con éxito
+  - echo "========================================================="
+  - echo "🎉 INSTALACIÓN DE DOCKER COMPLETADA POR CLOUD-INIT 🎉"
+  - echo "========================================================="
