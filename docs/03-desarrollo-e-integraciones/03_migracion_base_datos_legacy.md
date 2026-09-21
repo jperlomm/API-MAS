@@ -24,66 +24,127 @@ graph LR
 
 ---
 
-## ⚙️ 2. EL MOTOR DE MIGRACIÓN: FUNCIÓN DINÁMICA POR CMTS
+## ⏰ 2. FASE 1: MIGRACIÓN DE DATOS ESTRUCTURALES (ESTÁTICOS)
 
-La migración se diseñó para realizarse **por tramos de CMTS** (Cable Modem Termination System). Esto permite migrar el servicio de un pueblo o nodo de forma progresiva sin afectar a los demás. 
+Antes de migrar dinámicamente los clientes y sus cable modems, **debemos migrar los datos estructurales de bajo cambio**. Si no hacemos esto primero, la migración de clientes fallará debido a restricciones de claves foráneas (Foreign Keys) en la base de datos.
 
-Para lograrlo, se programó en la base de datos la función almacenada:
-`admin.migrar_datos_por_cmts(p_target_cmts_id INT)`
-
-### Etapas del proceso de migración por código:
-
-1. **Limpieza de seguridad:**
-   Antes de insertar, la función limpia cualquier registro migrado anteriormente para ese CMTS específico. Esto evita registros duplicados y permite "re-correr" la migración en caso de cambios de último minuto.
-2. **Transformación de Clientes:**
-   Toma la información histórica, sanitiza espacios en blanco, estandariza teléfonos, correos y los mapea en la tabla `admin.clientes`.
-3. **Mapeo de Equipos (Cable Modems):**
-   Mapea los modems de los clientes (`admin.equipos`), validando y normalizando las direcciones MAC a minúsculas, números de serie y modelos físicos de equipos.
-4. **Mapeo de Suscripciones:**
-   Vincula al cliente con su plan de velocidad de internet contratado, IP fija asignada, subred DHCP asignada y segmento de red correspondiente en la tabla `admin.suscripciones`.
+Mapeamos y sincronizamos los siguientes catálogos estáticos de referencia:
+1. **Modelos de Equipos (`admin.equipos_modelos`):** Catálogo de marcas y modelos de cable modems habilitados.
+2. **Planes de Velocidad (`admin.servicios`):** Planes comerciales de internet con sus tarifas, límites de bajada/subida y ráfagas.
+3. **Equipos de Cabecera (`admin.cmts`):** Definición física de los CMTS de la red (IPs, comunidades SNMP, etc.).
+4. **Segmentos de Red (`admin.subredes`):** Rangos de subredes DHCP, máscaras, gateways y rangos de asignación fija de IPs.
 
 ---
 
-## 📈 3. ESTADÍSTICAS DEL CASO DE ÉXITO (CMTS 3 - CLUCELLAS)
+## 🐳 3. FASE 2: LEVANTAR LA DB LEGACY DESDE UN DUMP SQL
 
-Durante la primera ejecución oficial del motor ETL, realizamos la migración completa del nodo **CMTS 3 (Clucellas)**, logrando una consistencia del 100%:
+Para que la base de datos de producción pueda leer los datos legacy, debemos restaurar tu backup SQL (`pg_legacy_temp.sql` o `spiOLD.sql`) en un contenedor PostgreSQL temporal aislado.
 
+### 1. Iniciar un contenedor PostgreSQL temporal
+Corre este comando en el servidor Proxmox para levantar un Postgres independiente en el puerto `5433` (así no interfiere con tu Postgres de producción que usa el `5432`):
+```bash
+docker run --name isp-postgres-legacy \
+  -e POSTGRES_PASSWORD=clave_temporal_legacy \
+  -e POSTGRES_DB=pg_legacy_temp \
+  -p 5433:5432 \
+  -d postgres:15
+```
+
+### 2. Restaurar tu archivo de respaldo SQL (Dump) dentro del contenedor
+Una vez que el contenedor temporal esté activo, restaura tu volcado de datos histórico corriendo:
+```bash
+# Sintaxis para inyectar el archivo SQL al psql del contenedor
+docker exec -i isp-postgres-legacy psql -U postgres -d pg_legacy_temp < /ruta/a/tu/archivo_legacy.sql
+```
+
+---
+
+## ⚙️ 4. FASE 3: EL PROCESO ETL (MIGRACIÓN DINÁMICA POR CMTS)
+
+Una vez que la DB legacy está levantada en el puerto `5433`, habilitamos el Foreign Data Wrapper (FDW) en producción para conectarla, y ejecutamos la función dinámica por CMTS.
+
+### Paso 1: Habilitar FDW en la Base de Datos de Producción (SQL)
+Ejecuta esto dentro de tu base de datos de producción para abrir el canal de comunicación:
+```sql
+-- 1. Crear extensión
+CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+
+-- 2. Registrar el servidor extranjero apuntando a la IP local y puerto 5433
+CREATE SERVER legacy_server
+  FOREIGN DATA WRAPPER postgres_fdw
+  OPTIONS (host '127.0.0.1', port '5433', dbname 'pg_legacy_temp');
+
+-- 3. Crear el mapeo de usuario (usando las credenciales temporales del paso 3.1)
+CREATE USER MAPPING FOR current_user
+  SERVER legacy_server
+  OPTIONS (user 'postgres', password 'clave_temporal_legacy');
+
+-- 4. Importar las tablas del schema público legacy bajo un schema local llamado 'legacy'
+CREATE SCHEMA IF NOT EXISTS legacy;
+IMPORT FOREIGN SCHEMA public
+  FROM SERVER legacy_server
+  INTO legacy;
+```
+
+### Paso 2: Correr la función de migración dinámica por CMTS
+La función `admin.migrar_datos_por_cmts(p_target_cmts_id INT)` limpiará registros previos de ese nodo, procesará los clientes históricos, validará direcciones MAC y dará de alta las suscripciones dinámicas.
+
+```sql
+-- Ejemplo: Migrar todos los clientes y modems del CMTS 3 (Clucellas)
+SELECT admin.migrar_datos_por_cmts(3);
+```
+
+### 📈 Estadísticas logradas en CMTS 3:
 * **Clientes Migrados con Éxito:** `158`
 * **Equipos/Cable Modems Sincronizados:** `230`
 * **Suscripciones de Internet Activas:** `158`
-* **Tiempo de Ejecución:** `0.38 segundos` (¡Súper veloz gracias a FDW!).
+* **Tiempo de Ejecución:** `0.38 segundos` (¡Ultra veloz!).
 
 ---
 
-## 🧪 4. AUDITORÍA AUTOMÁTICA DE INTEGRIDAD (SRE VERIFY)
+## 🧹 5. FASE 4: LIMPIEZA Y SEGURIDAD POST-MIGRACIÓN
 
-Inmediatamente después de realizar la migración de los **158 clientes**, pusimos a prueba el motor de verificación automatizada del sistema SRE para asegurar que ningún cambio hubiese corrompido el comportamiento del sistema.
+Es una **regla crítica de SRE** no dejar contenedores temporales ni enlaces externos activos en producción una vez completado el trabajo, ya que consumen recursos y representan un riesgo de seguridad innecesario.
 
-### El flujo de verificación en producción:
-1. Se forzó la ejecución de `/opt/backups_system/backup_and_verify.sh`.
-2. El script generó un volcado SQL íntegro (`804.0K`).
-3. Creó un contenedor Alpine aislado de pruebas temporales.
-4. Restauró la base de datos recién migrada.
-5. **Auditoría de consistencia:** El script validó que los 158 clientes migrados (más el cliente administrador de prueba, logrando un total de **159 clientes**) estuvieran perfectamente estructurados y listos para facturar y aprovisionar DHCP.
-6. El canal de Telegram del NOC recibió la alerta verde: **`[SRE AUDIT] DB RESTORATION AND CONSISTENCY OK (159 clients checked)`**.
+### Paso 1: Desconectar y eliminar el enlace FDW en Producción (SQL)
+Ejecuta esto en tu base de datos de producción para borrar de forma segura el enlace extranjero:
+```sql
+-- Borrar el schema extranjero de forma segura (borra vistas y mapeos asociados)
+DROP SCHEMA IF EXISTS legacy CASCADE;
+
+-- Eliminar el mapeo de credenciales de usuario
+DROP USER MAPPING IF EXISTS FOR current_user SERVER legacy_server;
+
+-- Eliminar la definición de servidor extranjero
+DROP SERVER IF EXISTS legacy_server CASCADE;
+
+-- (Opcional) Eliminar la extensión de FDW si no se usará más
+DROP EXTENSION IF EXISTS postgres_fdw;
+```
+
+### Paso 2: Apagar y destruir el contenedor temporal Legacy (Bash)
+Ejecuta estos comandos en la terminal de tu servidor de producción para eliminar por completo el contenedor temporal y liberar toda la memoria RAM y caché asociadas:
+```bash
+# 1. Detener el contenedor temporal de la DB legacy
+docker stop isp-postgres-legacy
+
+# 2. Eliminar físicamente el contenedor
+docker rm isp-postgres-legacy
+
+# 3. Eliminar volúmenes huérfanos o temporales no utilizados para liberar espacio
+docker volume prune -f
+```
 
 ---
 
-## 📜 5. SINTAXIS PARA CORRER LA MIGRACIÓN
+## 🧪 6. VERIFICACIÓN Y AUDITORÍA SRE COMPLETA
 
-Si necesitas correr la migración para otro CMTS en el futuro, el procedimiento es el siguiente:
+Para verificar que la migración y la posterior limpieza se ejecutaron a la perfección, ejecutamos el validador automático del sistema:
 
-1. Ingresa a la base de datos de producción desde tu consola o cliente SQL de preferencia (como pgAdmin o DBeaver).
-2. Ejecuta el comando SQL especificando el ID del CMTS que deseas migrar (reemplaza `3` por el ID correspondiente):
-   ```sql
-   -- Ejemplo: Migrar los datos de todos los clientes vinculados al CMTS 3
-   SELECT admin.migrar_datos_por_cmts(3);
+1. Corre el script SRE de resguardo:
+   ```bash
+   sudo /opt/backups_system/backup_and_verify.sh
    ```
-3. Verifica los resultados en producción:
-   ```sql
-   -- Ver cantidad de clientes activos en producción
-   SELECT count(*) FROM admin.clientes;
-   
-   -- Ver cantidad de modems aprovisionados
-   SELECT count(*) FROM admin.equipos;
-   ```
+2. El script generará un dump SQL íntegro, levantará un contenedor de prueba Alpine, restaurará la base de datos limpia y verificará la existencia y consistencia de los **159 clientes activos** (158 migrados + 1 de prueba local).
+3. Recibirás un mensaje verde de confirmación en Telegram:
+   **`[SRE AUDIT] DB RESTORATION AND CONSISTENCY OK (159 clients checked)`**
