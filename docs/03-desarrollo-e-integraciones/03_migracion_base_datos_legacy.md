@@ -86,12 +86,17 @@ IMPORT FOREIGN SCHEMA public
   INTO legacy;
 ```
 
-### Paso 2: Correr la función de migración dinámica por CMTS
-La función `admin.migrar_datos_por_cmts(p_target_cmts_id INT)` limpiará registros previos de ese nodo, procesará los clientes históricos, validará direcciones MAC y dará de alta las suscripciones dinámicas.
+### Paso 2: Cargar el Script de Migración y Correr la función por CMTS
+La función `admin.migrar_datos_por_cmts(p_target_cmts_id INT)` está programada en el archivo `postgres_migration_complete.sql`. Puedes cargar este script en tu base de datos de producción activa e iniciar la migración del CMTS directamente desde tu consola Bash con estos dos comandos:
 
-```sql
--- Ejemplo: Migrar todos los clientes y modems del CMTS 3 (Clucellas)
-SELECT admin.migrar_datos_por_cmts(3);
+#### 1. Inyectar el archivo de funciones ETL dentro de tu contenedor activo:
+```bash
+docker exec -i isp-postgres psql -U postgres -d dhcp < /home/usuario/postgres_migration_complete.sql
+```
+
+#### 2. Ejecutar la función de migración para el CMTS 3 (Clucellas) directamente por consola:
+```bash
+docker exec -it isp-postgres psql -U postgres -d dhcp -c "SELECT * FROM admin.migrar_datos_por_cmts(3);"
 ```
 
 ### 📈 Estadísticas logradas en CMTS 3:
