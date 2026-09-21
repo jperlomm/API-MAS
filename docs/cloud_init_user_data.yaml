@@ -3,8 +3,8 @@
 # SPI MAS - PLANTILLA CLOUD-INIT (USER-DATA) PARA PROXMOX VE
 # =============================================================================
 # Este archivo automatiza la creación de usuarios, la inyección de llaves SSH,
-# la actualización del SO, la instalación de utilidades esenciales y la
-# configuración automática y silenciosa de Docker Engine + Compose v2.
+# la actualización del SO y la instalación de Docker Engine + Compose v2
+# utilizando EXACTAMENTE tu flujo y comandos secuenciales.
 # =============================================================================
 
 # --- 1. CONFIGURACIÓN DE USUARIOS ---
@@ -14,7 +14,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     lock_passwd: false
-    # Puedes usar tu clave SSH pública para ingresar de forma ultra segura sin contraseña
+    # Puedes colocar tu llave SSH pública de desarrollo aquí para entrar sin contraseña:
     ssh_authorized_keys:
       - ssh-rsa TU_CLAVE_PUBLICA_SSH_AQUÍ
 
@@ -31,28 +31,36 @@ packages:
   - git
   - ca-certificates
   - gnupg
-  - qemu-guest-agent  # Crucial: Permite a Proxmox conocer la IP de la VM y apagarla de forma limpia
+  - lsb-release       # Requerido para que funcione tu comando "lsb_release -cs"
+  - qemu-guest-agent  # Crucial para que Proxmox vea el estado e IP de la VM
 
-# --- 4. COMANDOS DE ARRANQUE (AUTOMATIZAR MONTAJES Y DOCKER) ---
+# --- 4. COMANDOS DE ARRANQUE (TU FLUJO SECUENCIAL DE DOCKER) ---
 runcmd:
-  # A. Crear carpetas físicas de montaje para la estructura Multi-Disco
+  # Crear carpetas de montaje físicas para discos SCSI
   - mkdir -p /backups
   - mkdir -p /var/lib/docker
 
-  # B. Agregar las llaves GPG y Repositorio oficial de Docker Engine
+  # [Paso 2.1 de tu flujo] Crear la carpeta para las llaves de seguridad
   - install -m 0755 -d /etc/apt/keyrings
-  - curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  - chmod a+r /etc/apt/keyrings/docker.gpg
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
 
-  # C. Instalar la última versión estable de Docker Engine y Docker Compose
+  # [Paso 2.2 de tu flujo] Descargar la llave GPG oficial de Docker
+  - curl -fsSL https://download.download.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - chmod a+r /etc/apt/keyrings/docker.gpg
+
+  # [Paso 2.3 de tu flujo] Configurar el repositorio estable (Usa tu comando exacto con lsb_release)
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  # [Paso 3 de tu flujo] Actualizar repositorios e instalar Docker y Docker Compose
   - apt-get update -y
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-  # D. Añadir al usuario principal al grupo de Docker (para evitar escribir sudo docker ...)
+  # [Verificación de tu flujo] Habilitar e iniciar Docker en el arranque del sistema
+  - systemctl enable --now docker
+
+  # [Paso 4 de tu flujo] Configurar tu usuario administrativo en el grupo de Docker
   - usermod -aG docker usuario
 
-  # E. Notificar en el log de inicio que la configuración finalizó con éxito
+  # Mensaje de finalización en logs
   - echo "========================================================="
-  - echo "🎉 INSTALACIÓN DE DOCKER COMPLETADA POR CLOUD-INIT 🎉"
+  - echo "🎉 INSTALACIÓN PERSONALIZADA DE DOCKER COMPLETADA 🎉"
   - echo "========================================================="
