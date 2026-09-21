@@ -2,21 +2,23 @@
 # =============================================================================
 # SPI MAS - PLANTILLA CLOUD-INIT (USER-DATA) PARA PROXMOX VE
 # =============================================================================
-# Este archivo automatiza la creación de usuarios, la inyección de llaves SSH,
-# la actualización del SO y la instalación de Docker Engine + Compose v2
-# utilizando EXACTAMENTE tu flujo y comandos secuenciales.
+# Este archivo automatiza la creación de usuarios, actualiza el SO, habilita el
+# login por contraseña vía SSH (obligatorio) e instala Docker Engine + Compose.
 # =============================================================================
 
-# --- 1. CONFIGURACIÓN DE USUARIOS ---
+# --- 1. CONFIGURACIÓN DE USUARIOS Y AUTENTICACIÓN ---
+# Habilitar explícitamente el acceso por SSH utilizando contraseña
+ssh_pwauth: true
+
 users:
   - name: usuario
     gecos: Usuario SPI
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     lock_passwd: false
-    # Puedes colocar tu llave SSH pública de desarrollo aquí para entrar sin contraseña:
-    ssh_authorized_keys:
-      - ssh-rsa TU_CLAVE_PUBLICA_SSH_AQUÍ
+    # Nota: Puedes escribir una contraseña aquí (en texto plano o hash),
+    # o simplemente configurarla de forma gráfica desde la pestaña Cloud-Init de Proxmox.
+    # Proxmox inyectará automáticamente la contraseña que elijas en su interfaz.
 
 # --- 2. CONFIGURACIÓN DEL AGENTE Y SERVICIOS ---
 # Actualizar el sistema de paquetes al primer arranque
@@ -31,8 +33,8 @@ packages:
   - git
   - ca-certificates
   - gnupg
-  - lsb-release       # Requerido para que funcione tu comando "lsb_release -cs"
-  - qemu-guest-agent  # Crucial para que Proxmox vea el estado e IP de la VM
+  - lsb-release       # Requerido para tu comando lsb_release
+  - qemu-guest-agent  # Crucial para comunicación bidireccional VM-Proxmox
 
 # --- 4. COMANDOS DE ARRANQUE (TU FLUJO SECUENCIAL DE DOCKER) ---
 runcmd:
@@ -44,10 +46,10 @@ runcmd:
   - install -m 0755 -d /etc/apt/keyrings
 
   # [Paso 2.2 de tu flujo] Descargar la llave GPG oficial de Docker
-  - curl -fsSL https://download.download.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   - chmod a+r /etc/apt/keyrings/docker.gpg
 
-  # [Paso 2.3 de tu flujo] Configurar el repositorio estable (Usa tu comando exacto con lsb_release)
+  # [Paso 2.3 de tu flujo] Configurar el repositorio estable (Usa tu comando con lsb_release)
   - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
   # [Paso 3 de tu flujo] Actualizar repositorios e instalar Docker y Docker Compose
@@ -59,6 +61,9 @@ runcmd:
 
   # [Paso 4 de tu flujo] Configurar tu usuario administrativo en el grupo de Docker
   - usermod -aG docker usuario
+
+  # Forzar reinicio de SSH para asegurar que aplique la configuración de contraseña
+  - systemctl restart ssh || systemctl restart sshd
 
   # Mensaje de finalización en logs
   - echo "========================================================="
