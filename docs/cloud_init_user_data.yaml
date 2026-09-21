@@ -1,13 +1,15 @@
 #cloud-config
 # =============================================================================
-# SPI MAS - PLANTILLA CLOUD-INIT (USER-DATA) PARA PROXMOX VE
+# SPI MAS - PLANTILLA CLOUD-INIT AUTOMATIZADA AL 100% (USER-DATA)
 # =============================================================================
-# Este archivo automatiza la creación de usuarios, actualiza el SO, habilita el
-# login por contraseña vía SSH (obligatorio) e instala Docker Engine + Compose.
+# Este archivo realiza TODO de forma automática en el primer arranque:
+# 1. Configura el usuario con contraseña segura spi_admin_pwd_123.
+# 2. Formatea y monta los discos SCSI secundarios en sus rutas correctas.
+# 3. Instala Docker Engine de forma nativa directo sobre el volumen rápido.
 # =============================================================================
 
 # --- 1. CONFIGURACIÓN DE USUARIOS Y AUTENTICACIÓN ---
-# Habilitar explícitamente el acceso por SSH utilizando contraseña
+# Habilitar el login de SSH por contraseña (obligatorio para imágenes cloud de Debian)
 ssh_pwauth: true
 
 users:
@@ -16,16 +18,14 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     lock_passwd: false
-    # Nota: Puedes escribir una contraseña aquí (en texto plano o hash),
-    # o simplemente configurarla de forma gráfica desde la pestaña Cloud-Init de Proxmox.
-    # Proxmox inyectará automáticamente la contraseña que elijas en su interfaz.
+    # Contraseña en hash SHA-512 correspondiente a: spi_admin_pwd_123
+    passwd: "$6$yvfDnlp2hYOpOLzD$4FVKVPwLjmvRXTNADvxiK/BWtgGZOvjwAa.E9WfLnFiOGb5Y.kbYNKcYTvIGJVnx/AlELve9zvlM0d4PmKQ8l0"
 
-# --- 2. CONFIGURACIÓN DEL AGENTE Y SERVICIOS ---
-# Actualizar el sistema de paquetes al primer arranque
+# --- 2. ACTUALIZACIÓN DE REPOSITORIOS ---
 package_update: true
 package_upgrade: true
 
-# --- 3. INSTALACIÓN DE PAQUETES NATIVOS DE DEBIAN (APT) ---
+# --- 3. INSTALACIÓN DE PAQUETES NATIVOS ---
 packages:
   - curl
   - rsync
@@ -33,39 +33,53 @@ packages:
   - git
   - ca-certificates
   - gnupg
-  - lsb-release       # Requerido para tu comando lsb_release
-  - qemu-guest-agent  # Crucial para comunicación bidireccional VM-Proxmox
+  - lsb-release
+  - qemu-guest-agent  # Permite comunicación VM-Proxmox
 
-# --- 4. COMANDOS DE ARRANQUE (TU FLUJO SECUENCIAL DE DOCKER) ---
+# --- 4. FORMATO AUTOMÁTICO DE DISCOS ADICIONALES ---
+# Cloud-Init detectará los discos virtuales scsi1 y scsi2 y los formateará en ext4
+fs_setup:
+  - label: docker_data
+    filesystem: 'ext4'
+    device: /dev/sdb     # scsi1 (40 GB para Docker y Base de datos)
+    overwrite: false
+  - label: backups_data
+    filesystem: 'ext4'
+    device: /dev/sdc     # scsi2 (20 GB para Backups)
+    overwrite: false
+
+# --- 5. MONTAJE PERSISTENTE EN /ETC/FSTAB ---
+# Cloud-Init creará las carpetas, buscará los UUIDs y los montará antes de instalar Docker
+mounts:
+  - [ /dev/sdb, /var/lib/docker, "ext4", "defaults,nofail,discard,noatime", "0", "2" ]
+  - [ /dev/sdc, /backups, "ext4", "defaults,nofail,discard", "0", "2" ]
+
+# --- 6. COMANDOS DE ARRANQUE (TU FLUJO SECUENCIAL DE DOCKER) ---
 runcmd:
-  # Crear carpetas de montaje físicas para discos SCSI
-  - mkdir -p /backups
-  - mkdir -p /var/lib/docker
-
-  # [Paso 2.1 de tu flujo] Crear la carpeta para las llaves de seguridad
+  # [Paso 2.1 de tu flujo] Crear la carpeta para las llaves de seguridad de Docker
   - install -m 0755 -d /etc/apt/keyrings
 
   # [Paso 2.2 de tu flujo] Descargar la llave GPG oficial de Docker
   - curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   - chmod a+r /etc/apt/keyrings/docker.gpg
 
-  # [Paso 2.3 de tu flujo] Configurar el repositorio estable (Usa tu comando con lsb_release)
+  # [Paso 2.3 de tu flujo] Configurar el repositorio estable (Usa tu comando lsb_release)
   - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
   # [Paso 3 de tu flujo] Actualizar repositorios e instalar Docker y Docker Compose
   - apt-get update -y
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-  # [Verificación de tu flujo] Habilitar e iniciar Docker en el arranque del sistema
+  # [Verificación de tu flujo] Habilitar e iniciar Docker en el arranque
   - systemctl enable --now docker
 
   # [Paso 4 de tu flujo] Configurar tu usuario administrativo en el grupo de Docker
   - usermod -aG docker usuario
 
-  # Forzar reinicio de SSH para asegurar que aplique la configuración de contraseña
+  # Reiniciar el SSH para aplicar el acceso por contraseña de forma segura
   - systemctl restart ssh || systemctl restart sshd
 
-  # Mensaje de finalización en logs
+  # Mensaje de éxito absoluto en los logs de inicialización
   - echo "========================================================="
-  - echo "🎉 INSTALACIÓN PERSONALIZADA DE DOCKER COMPLETADA 🎉"
+  - echo "🎉 VM SPI MAS TOTALMENTE APROVISIONADA SIN INTERVENCIÓN 🎉"
   - echo "========================================================="

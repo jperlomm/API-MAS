@@ -88,6 +88,10 @@ Para que todas las VMs que clones instalen automáticamente Docker, habiliten SS
 Hemos automatizado toda la clonación, configuración de IP, contraseñas y asignación de discos a través del script **`create_spi_server.sh`**. 
 
 1. Copia el archivo `docs/create_spi_server.sh` a tu servidor Proxmox físico como `/root/create_spi_server.sh`.
+
+touch create_spi_server.sh
+nano create_spi_server.sh
+
 2. Dale permisos de ejecución:
    ```bash
    chmod +x /root/create_spi_server.sh
@@ -95,7 +99,7 @@ Hemos automatizado toda la clonación, configuración de IP, contraseñas y asig
 3. **Ejecuta el script para aprovisionar un servidor entero en 1 segundo:**
    ```bash
    # Sintaxis: ./create_spi_server.sh <ID_DE_VM> <IP/SUBNET> <GATEWAY> <CONTRASEÑA>
-   /root/create_spi_server.sh 150 "192.168.2.106/24" "192.168.2.1" "mi_clave_secreta_123"
+   ./create_spi_server.sh 150 "192.168.2.107/24" "192.168.2.13" "11Smme27"
    ```
 
 El script se encargará de clonar la plantilla, inyectar la red/contraseña, crear y adjuntar los discos SCSI1 (40GB) y SCSI2 (20GB), y arrancar la máquina virtual de inmediato.
