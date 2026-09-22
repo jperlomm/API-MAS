@@ -1,13 +1,94 @@
-# 🐙 GUÍA SRE: CONFIGURACIÓN DE GIT EN EL SERVIDOR DE PRODUCCIÓN
+# 🐙 GUÍA SRE: GESTIÓN DE CLAVES SSH Y CONFIGURACIÓN DE GIT EN EL SERVIDOR
 ---
-Este manual contiene el procedimiento paso a paso para instalar, configurar y autenticar Git en tu servidor de producción Debian/Proxmox, permitiendo actualizar configuraciones mediante `git pull` de forma segura.
+Este manual explica cómo generar y administrar claves SSH para autenticación con **GitHub** y acceso remoto **sin contraseña**, así como el procedimiento para vincular e interactuar con Git en tu servidor de producción Debian/Proxmox.
 
 ---
 
-## ⚙️ PASO 1: Identificación inicial de Git
-Al igual que en tu PC de desarrollo, lo primero es decirle a Git quién está operando en el servidor para que los registros internos de auditoría sean correctos.
+## 🔑 1. GENERACIÓN Y GESTIÓN DE CLAVES SSH
 
-Conéctate a tu servidor por SSH y ejecuta:
+Las claves SSH funcionan en par:
+- **Clave Privada (`id_ed25519` o `id_rsa`):** NUNCA se comparte ni se envía por red. Permanece segura en la máquina origen (`~/.ssh/`).
+- **Clave Pública (`id_ed25519.pub` or `id_rsa.pub`):** Se copia al servidor destino o a servicios como GitHub (`~/.ssh/authorized_keys` o GitHub SSH Keys).
+
+### 🛠️ Paso 1.1: Generar un nuevo par de claves SSH
+Si estás en una máquina nueva (PC local o Servidor) que aún no tiene claves generadas en `~/.ssh/`:
+
+```bash
+# Opción recomendada (Algoritmo moderno Ed25519)
+ssh-keygen -t ed25519 -C "jperlo@mmelectronica.com"
+
+# Opción alternativa tradicional (RSA 4096 bits)
+ssh-keygen -t rsa -b 4096 -C "jperlo@mmelectronica.com"
+```
+*Cuando pida la ruta, presiona `Enter` para aceptar la ubicación por defecto (`~/.ssh/`).*
+*Cuando pida passphrase (contraseña), puedes presionar `Enter` para no requerir contraseña cada vez que la uses.*
+
+### 📄 Paso 1.2: Visualizar tu Clave Pública
+Para copiar tu clave pública a GitHub o a otro servidor:
+
+```bash
+# Si creaste llave Ed25519:
+cat ~/.ssh/id_ed25519.pub
+
+# Si creaste llave RSA:
+cat ~/.ssh/id_rsa.pub
+```
+*(Copia todo el texto resultante que comienza con `ssh-ed25519 ...` o `ssh-rsa ...`)*.
+
+---
+
+## 🔐 2. USO DE CLAVES SSH EN GITHUB (`git@github.com`)
+
+Para que el servidor o tu PC de desarrollo se comuniquen con tu repositorio privado `jperlomm/API-MAS` en GitHub sin ingresar usuario y contraseña:
+
+### Paso 2.1: Agregar la Clave Pública a tu cuenta de GitHub
+1. Entra a tu cuenta en GitHub.
+2. Ve a **Settings -> SSH and GPG keys**.
+3. Haz clic en **New SSH key**.
+4. En **Title**, escribe un nombre descriptivo (ej. `Servidor-Produccion-SPI` o `PC-Desarrollo-Local`).
+5. En **Key**, pega la clave pública que copiaste en el paso 1.2.
+6. Haz clic en **Add SSH key**.
+
+### Paso 2.2: Probar la conexión con GitHub
+Ejecuta el siguiente comando para verificar la autenticación:
+```bash
+ssh -T git@github.com
+```
+*(Respuesta esperada: `Hi jperlomm! You've successfully authenticated, but GitHub does not provide shell access.`)*.
+
+---
+
+## 🖥️ 3. USO DE CLAVES SSH PARA ACCESO AL SERVIDOR SIN CONTRASEÑA
+
+Para conectarte desde tu PC de desarrollo hacia el servidor Proxmox o ejecutar scripts automatizados (`deploy.sh`, `scp`, `rsync`) sin que te solicite contraseña en cada ejecución:
+
+### Paso 3.1: Copiar la Clave Pública de tu PC Local al Servidor
+Desde la terminal de tu **PC local de desarrollo**, ejecuta:
+
+```bash
+ssh-copy-id usuario@192.168.2.106
+```
+*(Te pedirá la contraseña del usuario `11Smme27` por última vez. A partir de este momento, la clave pública de tu PC quedará guardada en el archivo `~/.ssh/authorized_keys` del servidor).*
+
+### Paso 3.2: Método manual (Alternativa si `ssh-copy-id` no está disponible)
+Si prefieres hacerlo a mano:
+1. Copia el contenido de `~/.ssh/id_rsa.pub` de tu PC local.
+2. En el servidor, abre o crea el archivo de llaves autorizadas:
+   ```bash
+   nano ~/.ssh/authorized_keys
+   ```
+3. Pega la clave pública en una nueva línea, guarda (`Ctrl+O`) y sal (`Ctrl+X`).
+4. Asegura los permisos correctos en el servidor:
+   ```bash
+   chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
+   ```
+
+---
+
+## ⚙️ 4. CONFIGURACIÓN DE GIT EN EL SERVIDOR
+
+### Paso 4.1: Identificación de usuario en el Servidor
+En la terminal del servidor, establece tu identidad de auditoría:
 ```bash
 git config --global user.name "jperlomm"
 git config --global user.email "jperlo@mmelectronica.com"
@@ -15,80 +96,37 @@ git config --global user.email "jperlo@mmelectronica.com"
 
 ---
 
-## 🔐 PASO 2: Autenticación segura con GitHub
+## 🛠️ 5. VINCULAR LA CARPETA DE PRODUCCIÓN A GITHUB
 
-Dado que tu repositorio `jperlomm/API-MAS` es privado o requiere autenticación para descargar cambios, debes autorizar a tu servidor para conectarse a tu cuenta de GitHub. 
+### 📂 ESCENARIO A: Si la carpeta `~/spi` ya existe pero NO tiene Git
+Para convertir la carpeta existente en un repositorio vinculado a GitHub sin sobreescribir archivos locales como `.env`:
 
-La forma más profesional y segura de hacerlo es mediante **Claves SSH** (así el servidor no necesita guardar tu contraseña de GitHub).
-
-### 1. Copiar tu Clave Pública del Servidor:
-Ejecuta esto en la terminal de tu servidor para ver tu clave SSH pública (que creamos anteriormente):
 ```bash
-cat ~/.ssh/id_rsa.pub
-```
-*(Verás un texto largo que empieza con `ssh-rsa` o `ssh-ed25519` y termina con `usuario@...`)*. **Selecciona todo ese texto y cópialo.**
-
-### 2. Registrarla en GitHub:
-1. Entra a tu cuenta de GitHub en la web.
-2. Ve a tu **Perfil (arriba a la derecha) -> Settings -> SSH and GPG keys**.
-3. Haz clic en **New SSH key**.
-4. Ponle un título descriptivo (ejemplo: `Servidor-Producción-SPI`).
-5. En el campo **Key**, pega el texto de tu clave pública que copiaste en el punto anterior.
-6. Haz clic en **Add SSH key**.
-
----
-
-## 🛠️ PASO 3: Vincular tu Carpeta de Producción a GitHub
-
-Elige el escenario que aplique a tu estado actual en el servidor:
-
-### 📂 ESCENARIO A: Si ya tienes la carpeta `~/spi` con archivos pero NO tiene Git
-Si ya habías subido archivos mediante SCP o el script de despliegue, y deseas transformar esa carpeta en un repositorio de Git enlazado a GitHub de forma segura (sin perder archivos como tu `.env` local):
-
-Ejecuta estos comandos en la terminal de tu servidor:
-```bash
-# 1. Navegar a la carpeta del proyecto
 cd ~/spi
-
-# 2. Inicializar un repositorio local vacío
 git init
-
-# 3. Vincular el repositorio local al tuyo de GitHub usando SSH
 git remote add origin git@github.com:jperlomm/API-MAS.git
-
-# 4. Traer el historial de ramas desde GitHub
 git fetch origin
-
-# 5. Configurar tu rama local para que "apunte" y rastree a la rama 'main' de GitHub
 git checkout -f -B main origin/main
 ```
-*(Nota: Al usar `-f` forzamos la alineación de archivos del servidor con los de GitHub, pero **no te preocupes por tu archivo `.env`**, ya que al estar listado en el archivo `.gitignore` no será alterado ni borrado).*
 
----
-
-### 📂 ESCENARIO B: Si estás en una VM Limpia (Sin carpeta `~/spi` previa)
-Si estás desplegando una VM nueva y vacía, el proceso es infinitamente más sencillo: solo debes clonar directamente tu repositorio desde GitHub:
-
+### 📂 ESCENARIO B: En una VM completamente nueva (Sin carpeta `~/spi`)
 ```bash
-# Clonar directamente en la ruta ~/spi del servidor
 git clone git@github.com:jperlomm/API-MAS.git ~/spi
 ```
 
 ---
 
-## 🚀 PASO 4: Tu flujo diario de actualizaciones en 1 segundo
+## 🚀 6. FLUJO DIARIO DE TRABAJO (PUSH & PULL)
 
-Una vez configurado lo anterior, cada vez que desees aplicar un cambio que guardaste en tu PC de desarrollo:
+1. **En PC Local (Desarrollo):**
+   ```bash
+   git add .
+   git commit -m "Descripción de los cambios"
+   git push
+   ```
 
-### 1. En tu PC Local (Desarrollo):
-Subes los cambios confirmados a tu cuenta de GitHub:
-```bash
-git push
-```
-
-### 2. En tu Servidor (SSH):
-Navegas a la carpeta y descargas únicamente los cambios en 1 segundo:
-```bash
-cd ~/spi
-git pull
-```
+2. **En Servidor (Producción via SSH):**
+   ```bash
+   cd ~/spi
+   git pull
+   ```
