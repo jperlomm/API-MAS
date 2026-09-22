@@ -34,6 +34,7 @@ packages:
   - ca-certificates
   - gnupg
   - lsb-release
+  - cloud-guest-utils  # Utilidades para auto-redimensionamiento de disco
   - qemu-guest-agent  # Permite comunicación VM-Proxmox
 
 # --- 4. FORMATO AUTOMÁTICO DE DISCOS ADICIONALES ---
@@ -56,6 +57,10 @@ mounts:
 
 # --- 6. COMANDOS DE ARRANQUE (TU FLUJO SECUENCIAL DE DOCKER) ---
 runcmd:
+  # [Auto-expansión del disco raíz /dev/sda1 a 15 GB]
+  - growpart /dev/sda 1 || true
+  - resize2fs /dev/sda1 || true
+
   # [Paso 2.1 de tu flujo] Crear la carpeta para las llaves de seguridad de Docker
   - install -m 0755 -d /etc/apt/keyrings
 

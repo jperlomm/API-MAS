@@ -106,29 +106,46 @@ El script se encargará de clonar la plantilla, inyectar la red/contraseña, cre
 
 ---
 
+## 🛠️ MANTENIMIENTO: REDIMENSIONAR DISCOS EN VMs EXISTENTES
+Si tienes una VM previa (por ejemplo, la VM 150) cuyo disco base `scsi0` figuraba con 3 GB en Proxmox:
+
+1. **En la consola SSH de Proxmox física (root):**
+   ```bash
+   qm resize 150 scsi0 +12G
+   ```
+2. **Dentro de la VM Debian por SSH (`ssh usuario@192.168.2.107`):**
+   ```bash
+   sudo growpart /dev/sda 1
+   sudo resize2fs /dev/sda1
+   ```
+   *(Esto expandirá en caliente el sistema de archivos `/dev/sda1` a 15 GB con más de 11 GB libres de inmediato).*
+
+---
+
 ## 🏁 PASO 4: INGRESAR Y DESPLEGAR EL SISTEMA (CERO TRABAJO MANUAL)
 
 1. Enciende la VM (el script lo hace por ti) y **espera de 2 a 3 minutos** en tu pantalla sin tocar nada.
 2. En ese primer booteo, **la VM Debian se auto-configurará de forma silenciosa**:
+   * Redimensionará automáticamente el disco principal `/dev/sda1` de 3 GB a **15 GB**.
    * Formateará los discos secundarios SCSI1 y SCSI2 en `ext4`.
    * Los montará de forma persistente en `/var/lib/docker` y `/backups` y escribirá las entradas correspondientes en `/etc/fstab`.
    * Agregará las llaves GPG, repositorios oficiales e **instalará Docker Engine + Docker Compose v2 directamente sobre el almacenamiento rápido**.
    * Configurará tu cuenta de SSH y los permisos del grupo `docker`.
 3. Conéctate directamente por SSH usando la contraseña que definiste:
    ```bash
-   ssh usuario@192.168.2.106
+   ssh usuario@192.168.2.107
    ```
-4. **Verifica que los discos estén listos y montados:**
+4. **Verifica que los discos estén listos, extendidos y montados:**
    ```bash
    df -h
    ```
-   *(Verás `/dev/sdb` montado en `/var/lib/docker` y `/dev/sdc` montado en `/backups` de forma inmediata)*.
+   *(Verás `/dev/sda1` con 15 GB, `/dev/sdb` montado en `/var/lib/docker` y `/dev/sdc` montado en `/backups`)*.
 
-5. **¡Listo! Despliega SPI MAS:**
+5. **¡Listo! Despliega SPI MAS con Volumen Nombrado:**
    Solo te queda clonar tu código de producción en el servidor y levantar tus contenedores Docker con un comando:
    ```bash
-   # clonar tu repositorio o hacer rsync desde tu maquina local
    cd ~/spi && docker compose up -d
    ```
+   *(La base de datos utilizará el volumen nombrado `spi_postgres_data` almacenado físicamente en el disco de 40 GB `/var/lib/docker`)*.
 
 ¡Felicidades! Tienes un sistema de aprovisionamiento automatizado e Infraestructura como Código (IaC) digno de una arquitectura corporativa moderna.

@@ -57,8 +57,11 @@ qm set "$VM_ID" \
   --ipconfig0 "ip=${VM_IP},gw=${VM_GW}" \
   --nameserver "1.1.1.1 8.8.8.8"
 
-# 4. Crear e insertar discos virtuales SCSI adicionales
-echo -e "\n${YELLOW}💾 3/4 Creando y adjuntando discos segmentados independientes...${NC}"
+# 4. Redimensionar disco base y crear discos virtuales SCSI adicionales
+echo -e "\n${YELLOW}💾 3/4 Ajustando y creando discos segmentados independientes...${NC}"
+echo -e "${CYAN}📐 Redimensionando disco principal scsi0 del SO de 3 GB a 15 GB...${NC}"
+qm resize "$VM_ID" scsi0 15G
+
 echo -e "${CYAN}⚡ Creando disco SCSI1 de 40 GB para Motores Docker y base de datos...${NC}"
 qm set "$VM_ID" --scsi1 "${STORAGE_POOL}:40,discard=on,ssd=1"
 

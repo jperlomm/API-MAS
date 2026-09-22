@@ -27,7 +27,7 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=md5
       - PGDATA=/var/lib/postgresql/data
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
       - ./postgres/initdb:/docker-entrypoint-initdb.d
     network_mode: host
     healthcheck:
@@ -215,4 +215,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  postgres_data:
+    name: spi_postgres_data
 
