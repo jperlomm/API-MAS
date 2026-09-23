@@ -122,46 +122,17 @@ Si el archivo `.sql` está en tu servidor anterior (`192.168.2.106`), puedes tra
 
 ---
 
-### 📥 5.2 Inyectar el respaldo en la Base de Datos PostgreSQL
+### 📥 5.2 Ejecutar la Restauración Automatizada de la Base de Datos
 
-> [!IMPORTANT]
-> **Vaciar esquema previo:** Como PostgreSQL crea tablas vacías por defecto al iniciar por primera vez, debes limpiar el esquema ejecutando primero este comando de reseteo para evitar errores de "la relación ya existe":
-> ```bash
-> docker exec -i isp-postgres psql -U postgres -d dhcp -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-> ```
-
-#### Caso A: Si el backup es un archivo `.sql` plano (Ejemplo estándar de respaldo diario):
-```bash
-docker exec -i isp-postgres psql -U postgres -d dhcp < ~/spi/backups/dhcp_prod_2026-09-23.sql
-```
-
-#### Caso B: Si el backup es un archivo comprimido `.sql.gz` o `.dump.gz`:
-```bash
-gunzip -c ~/spi/backups/spi40db.dump.gz | docker exec -i isp-postgres psql -U postgres -d dhcp
-```
-
-*(El proceso de inyección tardará entre 2 y 10 segundos según el tamaño del ISP).*
-
----
-
-### 🔄 5.3 Resincronizar Secuencias de Auto-incremento (Fix para `user_refresh_tokens_pkey`)
-Al importar un respaldo SQL, las secuencias de IDs de tablas como `user_refresh_tokens` o `logs_autenticacion` deben re-alinearse al valor máximo actual. Ejecuta este comando de 1 segundo:
+Para evitar cualquier error humano o de tablas duplicadas, utiliza el script **`restore_backup.sh`** incluido en el repositorio. Este script realiza automáticamente la limpieza de esquemas, la inyección del dump, la resincronización de secuencias de IDs y el reinicio de servicios en un solo paso:
 
 ```bash
-docker exec -i isp-postgres psql -U postgres -d dhcp -c "
-DO \$\$
-DECLARE r RECORD;
-BEGIN
-    FOR r IN
-        SELECT table_schema, table_name, column_name, pg_get_serial_sequence(format('%I.%I', table_schema, table_name), column_name) as seq
-        FROM information_schema.columns
-        WHERE pg_get_serial_sequence(format('%I.%I', table_schema, table_name), column_name) IS NOT NULL
-    LOOP
-        EXECUTE format('SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I.%I), 0) + 1, false);',
-                       r.seq, r.column_name, r.table_schema, r.table_name);
-    END LOOP;
-END \$\$;"
+# Sintaxis: ./backups_system/restore_backup.sh /ruta/al/respaldo.sql
+cd ~/spi
+./backups_system/restore_backup.sh ~/spi/backups/dhcp_prod_2026-09-23.sql
 ```
+
+*(El proceso automatizado ejecutará la limpieza, importación, re-alineación de secuencias de auto-incremento y reinicio de contenedores en menos de 10 segundos).*
 
 ---
 
