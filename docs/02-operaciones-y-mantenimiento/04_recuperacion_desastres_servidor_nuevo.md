@@ -48,7 +48,15 @@ ssh usuario@192.168.2.107
 git clone git@github.com:jperlomm/API-MAS.git ~/spi
 ```
 
-> 📄 **Autenticación con GitHub:** Si utilizas la Opción B y la nueva VM no tiene autorizada tu llave SSH en GitHub, sigue la [Guía de Configuración de Git en Servidor](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/03_configuracion_git_en_servidor.md).
+### 🔗 Vincular el directorio de Backups al disco secundario de 20 GB
+Para garantizar que todos los archivos de respaldo se escriban directamente en el disco de 20 GB (`/backups`), crea el enlace simbólico ejecutando este comando:
+
+```bash
+mkdir -p /backups
+mv ~/spi/backups/* /backups/ 2>/dev/null || true
+rm -rf ~/spi/backups
+ln -s /backups ~/spi/backups
+```
 
 ---
 
