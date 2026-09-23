@@ -124,6 +124,12 @@ Si el archivo `.sql` está en tu servidor anterior (`192.168.2.106`), puedes tra
 
 ### 📥 5.2 Inyectar el respaldo en la Base de Datos PostgreSQL
 
+> [!IMPORTANT]
+> **Vaciar esquema previo:** Como PostgreSQL crea tablas vacías por defecto al iniciar por primera vez, debes limpiar el esquema ejecutando primero este comando de reseteo para evitar errores de "la relación ya existe":
+> ```bash
+> docker exec -i isp-postgres psql -U postgres -d dhcp -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+> ```
+
 #### Caso A: Si el backup es un archivo `.sql` plano (Ejemplo estándar de respaldo diario):
 ```bash
 docker exec -i isp-postgres psql -U postgres -d dhcp < ~/spi/backups/dhcp_prod_2026-09-23.sql
