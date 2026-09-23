@@ -103,14 +103,33 @@ docker compose ps
 
 ## 📥 PASO 5: RESTAURACIÓN DEL BACKUP DE BASE DE DATOS (30 SEGUNDOS)
 
-Copia el archivo de respaldo `.sql` o `.dump.gz` al nuevo servidor (por SCP, pendrive o carpeta `~/spi/backups/`) e inyéctalo en el contenedor activo de PostgreSQL:
+### 📤 5.1 Transferir el archivo de respaldo al nuevo servidor
+Si el archivo `.sql` está en tu servidor anterior (`192.168.2.106`), puedes transferirlo a la carpeta `~/spi/backups/` del nuevo servidor (`192.168.2.107`):
 
-### Caso A: Si el backup es un archivo `.sql` plano (Ejemplo estándar de respaldo diario):
+- **Opción Directa (Desde el Servidor Nuevo):**
+  ```bash
+  scp usuario@192.168.2.106:~/spi/backups/dhcp_prod_2026-09-23.sql ~/spi/backups/
+  ```
+
+- **Opción Puente (Desde tu PC Local si no hay conexión entre servidores):**
+  ```bash
+  # 1. Traer a tu PC:
+  scp usuario@192.168.2.106:~/spi/backups/dhcp_prod_2026-09-23.sql /tmp/
+
+  # 2. Enviar a la nueva VM:
+  scp /tmp/dhcp_prod_2026-09-23.sql usuario@192.168.2.107:~/spi/backups/
+  ```
+
+---
+
+### 📥 5.2 Inyectar el respaldo en la Base de Datos PostgreSQL
+
+#### Caso A: Si el backup es un archivo `.sql` plano (Ejemplo estándar de respaldo diario):
 ```bash
 docker exec -i isp-postgres psql -U postgres -d dhcp < ~/spi/backups/dhcp_prod_2026-09-23.sql
 ```
 
-### Caso B: Si el backup es un archivo comprimido `.sql.gz` o `.dump.gz`:
+#### Caso B: Si el backup es un archivo comprimido `.sql.gz` o `.dump.gz`:
 ```bash
 gunzip -c ~/spi/backups/spi40db.dump.gz | docker exec -i isp-postgres psql -U postgres -d dhcp
 ```
