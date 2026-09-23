@@ -26,9 +26,17 @@ send_telegram() {
     fi
 
     if [ -n "${bot_token}" ] && [ -n "${chat_id}" ]; then
-        curl -s -X POST "https://api.telegram.org/bot${bot_token}/sendMessage" \
+        local response
+        response=$(curl -s -X POST "https://api.telegram.org/bot${bot_token}/sendMessage" \
             -d "chat_id=${chat_id}" \
             -d "text=${mensaje}" \
-            -d "parse_mode=Markdown" > /dev/null || echo "⚠️ Advertencia: No se pudo enviar notificación a Telegram."
+            -d "parse_mode=Markdown" 2>&1)
+        if [[ "$response" != *"\"ok\":true"* ]]; then
+            echo "⚠️ Advertencia Telegram API: $response"
+        else
+            echo "📡 Notificación de Telegram enviada exitosamente a chat_id (${chat_id})."
+        fi
+    else
+        echo "ℹ️ Notificación de Telegram omitida: No se configuró TELEGRAM_BOT_TOKEN ni TELEGRAM_CHAT_ID en .env ni en la base de datos (admin.configuraciones)."
     fi
 }
