@@ -29,18 +29,26 @@ Si estás utilizando **Proxmox VE**, ejecuta el script de aprovisionamiento auto
 
 ---
 
-## 🐙 PASO 2: CONEXIÓN SSH Y OBTENCIÓN DEL CÓDIGO FUENTE (1 MINUTO)
+## 🚀 PASO 2: OBTENCIÓN DEL CÓDIGO FUENTE EN EL NUEVO SERVIDOR (1 MINUTO)
 
-1. Conéctate a la nueva máquina virtual por SSH:
-   ```bash
-   ssh usuario@192.168.2.107
-   ```
-2. Obtén el código de producción clonando el repositorio desde GitHub:
-   ```bash
-   git clone git@github.com:jperlomm/API-MAS.git ~/spi
-   ```
+Tienes dos opciones sumamente sencillas para transferir todo el proyecto a la nueva máquina virtual:
 
-> 📄 **Autenticación con GitHub:** Si la VM no tiene autorizada tu llave SSH en GitHub, sigue el [Manual de Configuración de Git en Servidor](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/03_configuracion_git_en_servidor.md).
+### 🟢 Opción A: Usando `./deploy.sh` desde tu PC local de desarrollo (La más rápida y fácil)
+Desde la terminal de tu computadora de desarrollo, simplemente ejecuta tu script de despliegue indicando la IP de la nueva VM:
+```bash
+cd ~/Documentos/antigravity/SPI-V1
+./deploy.sh
+```
+*(Este comando utilizará `rsync` para copiar en 5 segundos todo el proyecto, scripts, docker-compose y compilaciones a la ruta `~/spi` del nuevo servidor sin requerir llaves SSH de GitHub).*
+
+### 🔵 Opción B: Usando `git clone` directamente desde el servidor
+Si estás conectado por SSH dentro del servidor y prefieres descargarlo desde GitHub:
+```bash
+ssh usuario@192.168.2.107
+git clone git@github.com:jperlomm/API-MAS.git ~/spi
+```
+
+> 📄 **Autenticación con GitHub:** Si utilizas la Opción B y la nueva VM no tiene autorizada tu llave SSH en GitHub, sigue la [Guía de Configuración de Git en Servidor](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/03_configuracion_git_en_servidor.md).
 
 ---
 
