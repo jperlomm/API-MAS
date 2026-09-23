@@ -103,16 +103,16 @@ docker compose ps
 
 ## 📥 PASO 5: RESTAURACIÓN DEL BACKUP DE BASE DE DATOS (30 SEGUNDOS)
 
-Copia el archivo de respaldo `.sql` o `.dump.gz` al nuevo servidor (por SCP o pendrive) e inyéctalo en el contenedor activo de PostgreSQL:
+Copia el archivo de respaldo `.sql` o `.dump.gz` al nuevo servidor (por SCP, pendrive o carpeta `~/spi/backups/`) e inyéctalo en el contenedor activo de PostgreSQL:
 
-### Caso A: Si el backup es un archivo `.sql` plano:
+### Caso A: Si el backup es un archivo `.sql` plano (Ejemplo estándar de respaldo diario):
 ```bash
-docker exec -i isp-postgres psql -U postgres -d dhcp < /ruta/al/respaldo_dhcp.sql
+docker exec -i isp-postgres psql -U postgres -d dhcp < ~/spi/backups/dhcp_prod_2026-09-23.sql
 ```
 
 ### Caso B: Si el backup es un archivo comprimido `.sql.gz` o `.dump.gz`:
 ```bash
-gunzip -c /ruta/al/respaldo.dump.gz | docker exec -i isp-postgres psql -U postgres -d dhcp
+gunzip -c ~/spi/backups/spi40db.dump.gz | docker exec -i isp-postgres psql -U postgres -d dhcp
 ```
 
 *(El proceso de inyección tardará entre 2 y 10 segundos según el tamaño del ISP).*
