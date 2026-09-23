@@ -141,11 +141,15 @@ Si tienes una VM previa (por ejemplo, la VM 150) cuyo disco base `scsi0` figurab
    ```
    *(Verás `/dev/sda1` con 15 GB, `/dev/sdb` montado en `/var/lib/docker` y `/dev/sdc` montado en `/backups`)*.
 
-5. **¡Listo! Despliega SPI MAS con Volumen Nombrado:**
-   Solo te queda clonar tu código de producción en el servidor y levantar tus contenedores Docker con un comando:
-   ```bash
-   cd ~/spi && docker compose up -d
-   ```
-   *(La base de datos utilizará el volumen nombrado `spi_postgres_data` almacenado físicamente en el disco de 40 GB `/var/lib/docker`)*.
+5. **¡Listo! Continúa según tu escenario de despliegue:**
+   - **Para configurar Git y clonar por SSH:** Consulta la [Guía de Configuración de Git en el Servidor](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/03_configuracion_git_en_servidor.md).
+   - **Para restaurar un backup o desastre en el servidor nuevo:** Consulta el [Playbook de Recuperación ante Desastres](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/04_recuperacion_desastres_servidor_nuevo.md).
 
-¡Felicidades! Tienes un sistema de aprovisionamiento automatizado e Infraestructura como Código (IaC) digno de una arquitectura corporativa moderna.
+---
+
+## 🔗 MANUALES Y GUÍAS RELACIONADAS (ARQUITECTURA MODULAR DRY)
+- 📄 [Plantilla Cloud-Init User-Data](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/01-infraestructura-y-servidores/02_plantilla_cloudinit_userdata.yaml)
+- 📄 [Script de Aprovisionamiento Proxmox (`create_spi_server.sh`)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/01-infraestructura-y-servidores/03_script_creacion_proxmox.sh)
+- 📄 [Guía de Operaciones Diarias del ISP](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/01_guia_operaciones_diarias.md)
+- 📄 [Playbook de Recuperación ante Desastres (Disaster Recovery)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/04_recuperacion_desastres_servidor_nuevo.md)
+

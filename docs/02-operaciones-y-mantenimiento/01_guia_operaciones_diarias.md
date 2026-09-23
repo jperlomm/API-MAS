@@ -127,3 +127,25 @@ Sincroniza tu copia local con lo último que esté subido a GitHub:
 ```bash
 git pull
 ```
+
+---
+
+## 📚 ÍNDICE MAESTRO DE MANUALES Y DOCUMENTACIÓN SRE (ARQUITECTURA DRY)
+
+### 📂 01. Infraestructura y Servidores
+* 📄 [01. Manual de Proxmox VE + Cloud-Init (IaC)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/01-infraestructura-y-servidores/01_manual_proxmox_cloudinit.md)
+* 📄 [02. Plantilla Cloud-Init User-Data YAML](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/01-infraestructura-y-servidores/02_plantilla_cloudinit_userdata.yaml)
+* 📄 [03. Script de Aprovisionamiento Proxmox (`create_spi_server.sh`)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/01-infraestructura-y-servidores/03_script_creacion_proxmox.sh)
+* 📄 [04. Plantilla Debian Preseed CFG](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/01-infraestructura-y-servidores/04_plantilla_debian_preseed.cfg)
+
+### 📂 02. Operaciones y Mantenimiento
+* 📄 [01. Guía de Operaciones Diarias y Administración](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/01_guia_operaciones_diarias.md)
+* 📄 [02. Actualización y Reparación de Servicios en Caliente (`--no-deps`)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/02_actualizacion_y_reparacion_servicios.md)
+* 📄 [03. Configuración y Autenticación SSH/Git en Servidor](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/03_configuracion_git_en_servidor.md)
+* 📄 [04. Playbook de Recuperación ante Desastres (Disaster Recovery en Servidor Nuevo)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/04_recuperacion_desastres_servidor_nuevo.md)
+
+### 📂 03. Desarrollo e Integraciones
+* 📄 [01. Documentación de API y Controladores](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/03-desarrollo-e-integraciones/01_documentacion_api.md)
+* 📄 [02. Integración IPAM y Kea DHCP](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/03-desarrollo-e-integraciones/02_integracion_ipam_kea.md)
+* 📄 [03. Manual de Migración de Base de Datos Legacy](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/03-desarrollo-e-integraciones/03_migracion_base_datos_legacy.md)
+
