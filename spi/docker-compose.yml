@@ -197,8 +197,8 @@ services:
     volumes:
       # Socket de Docker para poder crear y destruir el Postgres temporal de verificación
       - /var/run/docker.sock:/var/run/docker.sock
-      # Mapeo de la carpeta de backups para persistencia local
-      - ./backups:/opt/backups
+      # Mapeo directo al punto de montaje del disco secundario de backups (/dev/sdc en Proxmox)
+      - /backups:/opt/backups
       # Mapeo del código de scripts de backup
       - ./backups_system:/opt/backups_system
       # Montaje de la clave SSH para SCP/rsync remota
