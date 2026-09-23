@@ -143,6 +143,7 @@ git pull
 * 📄 [02. Actualización y Reparación de Servicios en Caliente (`--no-deps`)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/02_actualizacion_y_reparacion_servicios.md)
 * 📄 [03. Configuración y Autenticación SSH/Git en Servidor](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/03_configuracion_git_en_servidor.md)
 * 📄 [04. Playbook de Recuperación ante Desastres (Disaster Recovery en Servidor Nuevo)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/04_recuperacion_desastres_servidor_nuevo.md)
+* 📄 [05. Guía de Expansión de Discos en Caliente (Sin Reiniciar la VM)](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/02-operaciones-y-mantenimiento/05_guia_expansion_discos_en_caliente.md)
 
 ### 📂 03. Desarrollo e Integraciones
 * 📄 [01. Documentación de API y Controladores](file:///home/usuario/Documentos/antigravity/SPI-V1/docs/03-desarrollo-e-integraciones/01_documentacion_api.md)
