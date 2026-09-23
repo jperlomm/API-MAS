@@ -144,6 +144,27 @@ gunzip -c ~/spi/backups/spi40db.dump.gz | docker exec -i isp-postgres psql -U po
 
 ---
 
+### 🔄 5.3 Resincronizar Secuencias de Auto-incremento (Fix para `user_refresh_tokens_pkey`)
+Al importar un respaldo SQL, las secuencias de IDs de tablas como `user_refresh_tokens` o `logs_autenticacion` deben re-alinearse al valor máximo actual. Ejecuta este comando de 1 segundo:
+
+```bash
+docker exec -i isp-postgres psql -U postgres -d dhcp -c "
+DO \$\$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN
+        SELECT table_schema, table_name, column_name, pg_get_serial_sequence(format('%I.%I', table_schema, table_name), column_name) as seq
+        FROM information_schema.columns
+        WHERE pg_get_serial_sequence(format('%I.%I', table_schema, table_name), column_name) IS NOT NULL
+    LOOP
+        EXECUTE format('SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I.%I), 0) + 1, false);',
+                       r.seq, r.column_name, r.table_schema, r.table_name);
+    END LOOP;
+END \$\$;"
+```
+
+---
+
 ## 🔄 PASO 6: REINICIO Y VERIFICACIÓN SRE DE SALUD
 
 1. Reinicia los servicios para que **Kea DHCP**, la **API Backend** y el **Backup Manager** carguen en memoria la base de datos restaurada:
