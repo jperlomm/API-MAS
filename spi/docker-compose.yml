@@ -208,7 +208,7 @@ services:
     entrypoint: >
       sh -c "chmod +x /opt/backups_system/*.sh &&
              /opt/backups_system/watchdog.sh &
-             echo '0 3 * * * /opt/backups_system/backup_and_verify.sh >> /var/log/backup.log 2>&1 || /opt/backups_system/alert_cron_failure.sh' > /etc/crontabs/root &&
+             echo '0 3 * * * /bin/bash /opt/backups_system/backup_and_verify.sh >> /var/log/backup.log 2>&1 || /bin/bash /opt/backups_system/alert_cron_failure.sh' > /etc/crontabs/root &&
              exec crond -f -l 2"
     logging:
       driver: "json-file"
