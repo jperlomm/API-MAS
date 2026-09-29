@@ -41,7 +41,7 @@ Todos estos comandos deben ejecutarse desde el servidor remoto en la carpeta del
 ---
 
 ### 📋 Monitoreo y Diagnóstico (Logs)
-* **Ver logs en tiempo real de todo el sistema:**
+* **Ver logs en tiempo real de todo el sistema (consola Docker):**
   ```bash
   docker compose logs -f
   ```
@@ -50,6 +50,15 @@ Todos estos comandos deben ejecutarse desde el servidor remoto en la carpeta del
   docker logs -f --tail 50 isp-admin-api
   ```
   *(Reemplaza `isp-admin-api` por `isp-kea-dhcp`, `isp-postgres`, o `isp-backup-manager` según desees).*
+
+* **Ver logs de archivos internos persistentes dentro de un contenedor (ej. Historial de Backups):**
+  ```bash
+  # Ver historial completo del registro de backups diarios:
+  docker exec -it isp-backup-manager cat /var/log/backup.log
+
+  # Ver las últimas 50 líneas del registro de backups en tiempo real:
+  docker exec -it isp-backup-manager tail -n 50 -f /var/log/backup.log
+  ```
 
 ---
 
