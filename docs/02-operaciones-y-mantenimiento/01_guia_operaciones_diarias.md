@@ -60,6 +60,18 @@ Todos estos comandos deben ejecutarse desde el servidor remoto en la carpeta del
   docker exec -it isp-backup-manager tail -n 50 -f /var/log/backup.log
   ```
 
+#### 📌 Resumen de Ubicación de Logs por Servicio:
+
+| Contenedor | Tipo de Log | Comando Recomendado (El más rápido) |
+| :--- | :--- | :--- |
+| **`isp-backup-manager`** | Archivo Cron interno (`/var/log/backup.log`) | `docker exec -it isp-backup-manager cat /var/log/backup.log` |
+| **`isp-admin-api`** | Consola .NET / Serilog (`stdout`) | `docker logs -f isp-admin-api` |
+| **`isp-kea-dhcp`** | Registro DHCP Kea (`stdout` y `/var/log/kea/`) | `docker logs -f isp-kea-dhcp` |
+| **`isp-postgres`** | Motor PostgreSQL (`stdout`) | `docker logs -f isp-postgres` |
+| **`isp-web-client`** | Access/Error logs Nginx (`/var/log/nginx/`) | `docker logs -f isp-web-client` |
+| **`isp-tftp`** | Servicio TFTP (`stdout`) | `docker logs -f isp-tftp` |
+| **`isp-tod`** | Servidor ToD (`stdout`) | `docker logs -f isp-tod` |
+
 ---
 
 ### 🧹 Mantenimiento de Disco (Liberar Espacio)
