@@ -13,7 +13,7 @@ set -Eeuo pipefail
 
 # Configuración de Servidor de Producción (VM en Proxmox)
 SERVER_USER="usuario"
-SERVER_IP="192.168.2.106"
+SERVER_IP="192.168.2.20"
 REMOTE_DIR="~/spi"
 
 # Directorio local absoluto del proyecto (resuelve donde sea que se invoque el script)
@@ -48,8 +48,24 @@ rsync -avz --delete \
 
 echo -e "${GREEN}✅ Paso 1 completado: Servidor sincronizado con el código más reciente.${NC}"
 
-# Paso 2: Recompilación y Despliegue del Contenedor de Producción
-echo -e "\n${YELLOW}🚀 Paso 2: Reconstruyendo imágenes y levantando servicios en Docker...${NC}"
+# Paso 2: Verificar presencia del archivo .env en el servidor remoto
+echo -e "\n${YELLOW}🔐 Paso 2: Verificando archivo de entorno (.env) en el servidor...${NC}"
+ssh "$SERVER_USER@$SERVER_IP" "
+  if [ ! -f $REMOTE_DIR/.env ]; then
+    echo '⚠️ .env no encontrado en el servidor. Generando .env por defecto...'
+    cat << 'EOF' > $REMOTE_DIR/.env
+ISP_NAME=SPI
+POSTGRES_PASSWORD=P0stgr3s
+POSTGRES_DB=dhcp
+SNMP_COMMUNITY=public
+BACKUP_RETENTION_DAYS=7
+EOF
+    echo '✅ Archivo .env generado exitosamente en el servidor remoto.'
+  fi
+"
+
+# Paso 3: Recompilación y Despliegue del Contenedor de Producción
+echo -e "\n${YELLOW}🚀 Paso 3: Reconstruyendo imágenes y levantando servicios en Docker...${NC}"
 
 if [ "$SERVICE" = "all" ]; then
     echo -e "${CYAN}🤖 Procesando AMBOS servicios en caliente: web-client y admin-api...${NC}"
