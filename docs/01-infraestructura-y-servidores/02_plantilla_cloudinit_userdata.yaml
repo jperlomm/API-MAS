@@ -42,18 +42,18 @@ packages:
 fs_setup:
   - label: docker_data
     filesystem: 'ext4'
-    device: /dev/sdb     # scsi1 (40 GB para Docker y Base de datos)
+    device: /dev/sda     # 40 GB para Docker y Base de datos
     overwrite: false
   - label: backups_data
     filesystem: 'ext4'
-    device: /dev/sdc     # scsi2 (20 GB para Backups)
+    device: /dev/sdb     # 20 GB para Backups
     overwrite: false
 
-# --- 5. MONTAJE PERSISTENTE EN /ETC/FSTAB ---
-# Cloud-Init creará las carpetas, buscará los UUIDs y los montará antes de instalar Docker
+# --- 5. MONTAJE PERSISTENTE POR ETIQUETA EN /ETC/FSTAB ---
+# Cloud-Init creará las carpetas y las montará por etiqueta independientemente del orden SCSI
 mounts:
-  - [ /dev/sdb, /var/lib/docker, "ext4", "defaults,nofail,discard,noatime", "0", "2" ]
-  - [ /dev/sdc, /backups, "ext4", "defaults,nofail,discard", "0", "2" ]
+  - [ LABEL=docker_data, /var/lib/docker, "ext4", "defaults,nofail,discard,noatime", "0", "2" ]
+  - [ LABEL=backups_data, /backups, "ext4", "defaults,nofail,discard", "0", "2" ]
 
 # --- 6. COMANDOS DE ARRANQUE (TU FLUJO SECUENCIAL DE DOCKER) ---
 runcmd:
