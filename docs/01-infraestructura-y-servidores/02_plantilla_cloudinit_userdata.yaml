@@ -42,11 +42,11 @@ packages:
 fs_setup:
   - label: docker_data
     filesystem: 'ext4'
-    device: /dev/sda     # 40 GB para Docker y Base de datos
+    device: /dev/sdb     # scsi1 (40 GB para Docker y Base de datos)
     overwrite: false
   - label: backups_data
     filesystem: 'ext4'
-    device: /dev/sdb     # 20 GB para Backups
+    device: /dev/sdc     # scsi2 (20 GB para Backups)
     overwrite: false
 
 # --- 5. MONTAJE PERSISTENTE POR ETIQUETA EN /ETC/FSTAB ---
