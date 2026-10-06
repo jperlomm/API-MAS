@@ -82,7 +82,7 @@ services:
     environment:
       - DATABASE_URL=Host=127.0.0.1;Port=5432;Database=${POSTGRES_DB};Username=postgres;Password=${POSTGRES_PASSWORD}
       - TFTP_DIRECTORY=/app/tftp
-      - INFRA_SERVER_IP=192.168.2.106
+      - INFRA_SERVER_IP=192.168.2.20
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - SNMP_COMMUNITY=${SNMP_COMMUNITY}
@@ -91,7 +91,7 @@ services:
       - ./kea:/app/kea
       - /var/run/kea:/var/run/kea:ro
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./backups:/app/backups:ro
+      - /backups:/app/backups:ro
     network_mode: host
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/api/health || exit 1"]
