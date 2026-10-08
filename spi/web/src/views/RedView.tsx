@@ -922,7 +922,7 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
                               }} />
                             </div>
                             <span style={{ fontSize: '10px', opacity: 0.8, fontWeight: 'bold' }}>
-                              {p.ipsAsignadas > 0 && ((p.ipsAsignadas / (p.totalIps || 1)) * 100) < 1 
+                              {(p.ipsAsignadas || 0) > 0 && (((p.ipsAsignadas || 0) / (p.totalIps || 1)) * 100) < 1 
                                 ? '<1%' 
                                 : `${(((p.ipsAsignadas || 0) / (p.totalIps || 1)) * 100).toFixed(0)}%`}
                               <span style={{ opacity: 0.5, fontWeight: 'normal', marginLeft: '4px' }}>
