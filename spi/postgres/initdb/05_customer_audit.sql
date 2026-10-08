@@ -106,7 +106,7 @@ BEGIN
     ELSIF (TG_OP = 'DELETE') THEN
         INSERT INTO admin.auditoria_clientes (id_cliente, nombre_cliente, usuario, accion, detalle, valores_anteriores)
         VALUES (
-            OLD.id,
+            NULL, -- Se asigna NULL a id_cliente porque el registro ya fue eliminado en AFTER DELETE (nombre_cliente preserva la razón social)
             OLD.razon_social,
             v_username,
             'BAJA_CLIENTE',
