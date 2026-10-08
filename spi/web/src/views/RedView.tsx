@@ -915,15 +915,20 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
                                 overflow: 'hidden',
                                 position: 'relative'
                               }}>
-                                <div style={{
-                                  width: `${Math.min(100, ((p.ipsAsignadas || 0) / (p.totalIps || 1)) * 100)}%`,
-                                  background: 'var(--primary-color)',
-                                  height: '100%'
-                                }} />
-                              </div>
-                              <span style={{ fontSize: '10px', opacity: 0.8, fontWeight: 'bold' }}>
-                                {(((p.ipsAsignadas || 0) / (p.totalIps || 1)) * 100).toFixed(0)}%
+                              <div style={{
+                                width: `${Math.max(p.ipsAsignadas ? 8 : 0, Math.min(100, ((p.ipsAsignadas || 0) / (p.totalIps || 1)) * 100))}%`,
+                                background: 'var(--primary-color)',
+                                height: '100%'
+                              }} />
+                            </div>
+                            <span style={{ fontSize: '10px', opacity: 0.8, fontWeight: 'bold' }}>
+                              {p.ipsAsignadas > 0 && ((p.ipsAsignadas / (p.totalIps || 1)) * 100) < 1 
+                                ? '<1%' 
+                                : `${(((p.ipsAsignadas || 0) / (p.totalIps || 1)) * 100).toFixed(0)}%`}
+                              <span style={{ opacity: 0.5, fontWeight: 'normal', marginLeft: '4px' }}>
+                                ({p.ipsAsignadas || 0}/{p.totalIps || 0})
                               </span>
+                            </span>
                             </div>
                           </td>
                           <td style={{ textAlign: 'center' }}>

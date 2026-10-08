@@ -139,7 +139,7 @@ namespace SmiApi.Controllers
                             SELECT COUNT(*)::int 
                             FROM public.lease4 l 
                             WHERE l.state = 0 
-                              AND l.expire > CURRENT_TIMESTAMP 
+                              AND l.expire > EXTRACT(EPOCH FROM NOW()) 
                               AND l.address >= (p.rango_inicio - '0.0.0.0'::inet)::bigint
                               AND l.address <= (p.rango_fin - '0.0.0.0'::inet)::bigint
                         ), 0)::int AS ips_asignadas,
