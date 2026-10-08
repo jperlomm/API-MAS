@@ -151,6 +151,69 @@ git pull
 
 ---
 
+## 📡 5. DIAGNÓSTICO Y MONITOREO EN VIVO DE TRÁFICO DHCP Y TFTP
+
+### 🕵️‍♂️ Captura de Solicitudes DHCP en Vivo (Red / `tcpdump`)
+Para inspeccionar las solicitudes `DHCPDISCOVER`, `DHCPREQUEST` y paquetes Relay del CMTS (`giaddr`):
+```bash
+# Captura completa de solicitudes UDP DHCP (puertos 67 y 68):
+sudo tcpdump -i any -n -v port 67 or port 68
+
+# Captura con encabezados Ethernet y direcciones MAC físicas:
+sudo tcpdump -i any -e -n port 67 or port 68
+```
+
+---
+
+### 🪵 Logs del Motor Kea DHCP Filtrados
+Para seguir las decisiones de asignación, evaluación de clases de velocidad y Bootfiles en vivo:
+```bash
+docker logs -f isp-kea-dhcp | grep -iE "DHCPDISCOVER|DHCPREQUEST|EVAL_RESULT|ALLOC_ENGINE"
+```
+
+---
+
+### 📂 Consulta de IP del Servidor TFTP (siNextServer / Opción 66)
+Para verificar qué IP de servidor TFTP se le entrega a los cablemódems para la descarga de Bootfiles DOCSIS:
+
+```bash
+# 1. Consultar la IP central de infraestructura configurada en la DB:
+docker exec -i isp-postgres psql -U postgres -d dhcp -c "SELECT clave, valor FROM admin.configuraciones WHERE clave = 'infra_server_ip';"
+
+# 2. Ver la IP TFTP real inyectada en las reservas de Kea DHCP (public.hosts):
+docker exec -i isp-postgres psql -U postgres -d dhcp -c "
+SELECT 
+    host_id, 
+    ('0.0.0.0'::inet + dhcp4_next_server) AS ip_tftp_server, 
+    dhcp4_boot_file_name AS bootfile 
+FROM public.hosts 
+WHERE dhcp4_next_server IS NOT NULL 
+LIMIT 5;
+"
+
+# 3. Ver la configuración de next-server enviada en Kea DHCP:
+docker exec -i isp-kea-dhcp cat /etc/kea/kea-dhcp4.conf | grep -iE "next-server|tftp-server-name|boot-file-name"
+```
+
+---
+
+### 📊 Concesiones / Leases Entregadas Recientemente
+Para verificar las asignaciones de IP activas otorgadas por el servidor DHCP:
+```bash
+docker exec -i isp-postgres psql -U postgres -d dhcp -c "
+SELECT 
+    address, 
+    encode(hwaddr, 'hex') AS mac, 
+    subnet_id, 
+    to_timestamp(expire) AS expira 
+FROM public.lease4 
+ORDER BY expire DESC 
+LIMIT 10;
+"
+```
+
+---
+
 ## 📚 ÍNDICE MAESTRO DE MANUALES Y DOCUMENTACIÓN SRE (ARQUITECTURA DRY)
 
 ### 📂 01. Infraestructura y Servidores
