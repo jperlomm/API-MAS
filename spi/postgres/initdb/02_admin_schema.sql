@@ -130,7 +130,7 @@ CREATE TABLE admin.servicios_clientes (
     id_cliente INT NOT NULL REFERENCES admin.clientes(id) ON DELETE RESTRICT,
     id_equipo INT NOT NULL UNIQUE REFERENCES admin.equipos(id) ON DELETE RESTRICT,
     id_paquete INT NOT NULL REFERENCES admin.paquetes(id) ON DELETE RESTRICT,
-    id_cmts INT NOT NULL REFERENCES admin.cmts(id) ON DELETE RESTRICT,
+    id_cmts INT REFERENCES admin.cmts(id) ON DELETE RESTRICT,
     ip_cm INET,    -- IP fija opcional del Cablemodem. Si es NULL, toma IP dinámica de gestión.
     ip_cpe INET,   -- IP fija opcional del Router. Si es NULL, toma IP dinámica del pool de su plan.
     estado VARCHAR(50) DEFAULT 'ACTIVO' CHECK (estado IN ('ACTIVO', 'SUSPENDIDO', 'BAJA')),
