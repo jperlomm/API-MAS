@@ -4,21 +4,6 @@ Este manual resume el procedimiento real, optimizado e ininterrumpido utilizado 
 
 ---
 
-## 🛠️ PASO PREVIO: Extracción de un Backup Completo `.tar.bz2` (Opcional)
-
-Si tu copia de seguridad histórica proviene de un backup completo comprimido del sistema SPI 4.0 (ej. `backup_spi40_clucellas_2026-05-21_13.14.tar.bz2`), primero debes extraer el dump de la base de datos PostgreSQL:
-
-```bash
-# 1. Descomprimir el archivo tar.bz2 en tu equipo de desarrollo o servidor:
-tar -jxvf backup_spi40_clucellas_2026-05-21_13.14.tar.bz2
-
-# 2. Identificar el dump de la DB extraído (ej. spi40db.dump o dump.sql) y comprimir con gzip:
-gzip spi40db.dump
-```
-*(Esto generará el archivo `spi40db.dump.gz` requerido en el Paso 1).*
-
----
-
 ## 🚀 PROCESO DE MIGRACIÓN PASO A PASO
 
 ### 📦 PASO 1: Copiar el dump comprimido al Servidor (Desde tu PC Local)
@@ -66,7 +51,11 @@ Una vez restaurados todos tus datos sandbox en el puerto `5435`, realizamos el d
 
 #### 1. Inyectar el archivo de funciones ETL dentro de tu contenedor de producción activo:
 ```bash
-docker exec -i isp-postgres psql -U postgres -d dhcp < /home/usuario/postgres_migration_complete.sql
+# Si estás parado en la raíz del repositorio (/home/usuario/Documentos/antigravity/SPI-V1):
+docker exec -i isp-postgres psql -U postgres -d dhcp < postgres_migration_complete.sql
+
+# O especificando la ruta absoluta completa:
+docker exec -i isp-postgres psql -U postgres -d dhcp < /home/usuario/Documentos/antigravity/SPI-V1/postgres_migration_complete.sql
 ```
 *(Este script conecta automáticamente el FDW al puerto `5435`, migra datos estructurales de bajo cambio y registra las funciones ETL).*
 
