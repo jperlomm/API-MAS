@@ -51,6 +51,32 @@ Incluye el token en cada llamada:
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
+### C. Generar Token Fijo de Larga Duración (M2M / Servidores Externos)
+Para evitar que un servidor externo (CRM, ERP, Billing cron) tenga que autenticarse periódicamente, la API permite a un administrador emitir un **Token JWT Estático Fijo con validez de 10 años** (3.650 días) o la duración deseada.
+
+*   **Método:** `POST`
+*   **Ruta:** `/api/auth/generate-token`
+*   **Encabezado Requerido:** `Authorization: Bearer <Token_Admin_Actual>`
+*   **Cuerpo de la Petición:**
+    ```json
+    {
+      "diasValidez": 3650,
+      "descripcion": "Token Fijo para Servidor CRM Externo"
+    }
+    ```
+*   **Respuesta Exitosa (`200 OK`):**
+    ```json
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "expiracion": "2036-10-12T11:00:00Z",
+      "diasValidez": 3650,
+      "descripcion": "Token Fijo para Servidor CRM Externo",
+      "headerName": "Authorization",
+      "headerValue": "Bearer eyJhbGciOiJIUzI1...",
+      "instrucciones": "Utilice esta cabecera HTTP en todas las peticiones desde su servidor externo: Authorization: Bearer <Token>"
+    }
+    ```
+
 ---
 
 ## 2. Gestión Comercial de Clientes (Abonados)

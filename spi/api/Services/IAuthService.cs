@@ -19,4 +19,5 @@ public interface IAuthService
     Task<AuthResult> LoginAsync(LoginRequest request, string ipAddress, string userAgent);
     Task<AuthResult> RefreshSessionAsync(string oldRefreshToken, string ipAddress);
     Task RevokeSessionAsync(string refreshToken);
+    string GenerateLongLivedToken(Usuario usuario, int days = 3650);
 }

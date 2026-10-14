@@ -189,6 +189,36 @@ public class AuthService : IAuthService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    public string GenerateLongLivedToken(Usuario usuario, int days = 3650)
+    {
+        var jwtSettings = _configuration.GetSection("Jwt");
+        var secret = jwtSettings["Secret"] ?? "SPI_Super_Secret_Core_Carrier_Class_Signature_Key_2026!";
+        var issuer = jwtSettings["Issuer"] ?? "spi-network.net";
+        var audience = jwtSettings["Audience"] ?? "spi-network.net";
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+            new Claim(ClaimTypes.Name, usuario.Username),
+            new Claim(ClaimTypes.GivenName, usuario.NombreCompleto),
+            new Claim(ClaimTypes.Email, usuario.Email),
+            new Claim(ClaimTypes.Role, usuario.Rol)
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddDays(days),
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
     private static string GenerateSecureRandomString()
     {
         var randomBytes = new byte[64];

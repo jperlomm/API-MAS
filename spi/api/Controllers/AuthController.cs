@@ -16,11 +16,13 @@ namespace SmiApi.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly SmiApi.Repositories.IUserRepository _userRepository;
     private readonly IValidator<LoginRequest> _loginValidator;
 
-    public AuthController(IAuthService authService, IValidator<LoginRequest> loginValidator)
+    public AuthController(IAuthService authService, SmiApi.Repositories.IUserRepository userRepository, IValidator<LoginRequest> loginValidator)
     {
         _authService = authService;
+        _userRepository = userRepository;
         _loginValidator = loginValidator;
     }
 
@@ -136,6 +138,43 @@ public class AuthController : ControllerBase
         // Eliminar físicamente la cookie en el cliente
         Response.Cookies.Delete("refreshToken");
         return NoContent();
+    }
+
+    public class GenerateTokenRequest
+    {
+        public int DiasValidez { get; set; } = 3650; // 10 años por defecto
+        public string? Descripcion { get; set; }
+    }
+
+    [HttpPost("generate-token")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> GenerateLongLivedToken([FromBody] GenerateTokenRequest? request)
+    {
+        var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(idClaim) || !int.TryParse(idClaim, out var userId))
+        {
+            return Unauthorized(new { Error = "Usuario no identificado" });
+        }
+
+        var usuario = await _userRepository.GetByIdAsync(userId);
+        if (usuario == null || !usuario.Activo)
+        {
+            return BadRequest(new { Error = "El usuario administrador está inactivo o no existe." });
+        }
+
+        var dias = (request != null && request.DiasValidez > 0) ? request.DiasValidez : 3650;
+        var token = _authService.GenerateLongLivedToken(usuario, dias);
+
+        return Ok(new
+        {
+            Token = token,
+            Expiracion = DateTime.UtcNow.AddDays(dias),
+            DiasValidez = dias,
+            Descripcion = request?.Descripcion ?? "Token estático de integración M2M para servidor externo",
+            HeaderName = "Authorization",
+            HeaderValue = $"Bearer {token}",
+            Instrucciones = "Utilice esta cabecera HTTP en todas las peticiones desde su servidor externo: Authorization: Bearer <Token>"
+        });
     }
 
     [HttpGet("profile")]

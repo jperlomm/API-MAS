@@ -270,6 +270,41 @@ export const UsuariosView: React.FC<UsuariosViewProps> = ({ showToast }) => {
           </form>
         </div>
 
+        {/* Generador de Token Fijo M2M para Servidores Externos */}
+        <div className="panel-card" style={{ gridColumn: 'span 2' }}>
+          <div className="panel-title">
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <KeyRound style={{ color: '#10b981' }} /> Token Fijo M2M para Integración de Servidores (CRM / ERP)
+            </h3>
+          </div>
+          <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '16px' }}>
+            Genera un token de autenticación de larga duración (válido por 10 años / 3.650 días) para configurar en un servidor externo (CRM, sistema de facturación o cron de sincronización) sin tener que renovar credenciales manualmente.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn-primary"
+              style={{ backgroundColor: '#10b981' }}
+              onClick={async () => {
+                const res = await apiFetch<{ token: string; expiracion: string }>('/api/auth/generate-token', {
+                  method: 'POST',
+                  body: JSON.stringify({ diasValidez: 3650, descripcion: 'Token Fijo para Servidor Externo CRM' }),
+                });
+                if (res.success && res.data) {
+                  const tokenStr = res.data.token;
+                  navigator.clipboard.writeText(tokenStr);
+                  showToast('¡Token M2M de 10 años generado y copiado al portapapeles!', 'success');
+                  alert(`TOKEN FIJO GENERADO CON ÉXITO:\n\n${tokenStr}\n\nCabecera HTTP requerida en el servidor externo:\nAuthorization: Bearer ${tokenStr}`);
+                } else {
+                  showToast(res.error || 'No se pudo generar el token de integración.', 'error');
+                }
+              }}
+            >
+              <KeyRound size={16} style={{ marginRight: '6px' }} />
+              Generar y Copiar Token Fijo (10 Años)
+            </button>
+          </div>
+        </div>
+
         {/* Tabla de Usuarios Registrados */}
         <div className="panel-card">
           <div className="panel-title">
