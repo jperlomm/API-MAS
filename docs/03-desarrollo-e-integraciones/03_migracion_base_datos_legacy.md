@@ -10,10 +10,10 @@ Este manual resume el procedimiento real, optimizado e ininterrumpido utilizado 
 Abre una terminal en tu **PC local de desarrollo** y ejecuta estos comandos para subir la base de datos y el script ETL a la carpeta temporal `/tmp/` del servidor:
 ```bash
 # 1. Copiar el dump comprimido de la base legacy:
-scp "/home/usuario/Documentos/antigravity/SPI-V1/POSTREGRES LEGACY/spi40db.dump.gz" usuario@192.168.2.106:/tmp/
+scp "/home/usuario/Documentos/antigravity/SPI-V1/POSTREGRES LEGACY/spi40db.dump.gz" usuario@192.168.2.20:/tmp/
 
 # 2. Copiar el script de migración ETL:
-scp "/home/usuario/Documentos/antigravity/SPI-V1/postgres_migration_complete.sql" usuario@192.168.2.106:/tmp/
+scp "/home/usuario/Documentos/antigravity/SPI-V1/postgres_migration_complete.sql" usuario@192.168.2.20:/tmp/
 ```
 
 ---
@@ -21,7 +21,7 @@ scp "/home/usuario/Documentos/antigravity/SPI-V1/postgres_migration_complete.sql
 ### 🖥️ PASO 2: Conectarse al Servidor por SSH
 Una vez subidos los archivos, conéctate a la consola de tu servidor Proxmox/Debian desde tu PC local:
 ```bash
-ssh usuario@192.168.2.106
+ssh usuario@192.168.2.20
 ```
 
 ---
@@ -52,6 +52,8 @@ gunzip -c /tmp/spi40db.dump.gz | docker exec -i pg_legacy_temp psql -U postgres 
 
 ### 🖥️ PASO 5: Cargar ETL, Migrar CMTS y realizar la Limpieza
 Una vez restaurados todos tus datos sandbox en el puerto `5435`, realizamos el despliegue del script de migración desde `/tmp/`, la corrida de datos dinámica y eliminamos los recursos temporales:
+
+scp "/home/usuario/Documentos/antigravity/SPI-V1/postgres_migration_complete.sql" usuario@192.168.2.20:/tmp/
 
 #### 1. Inyectar el archivo de funciones ETL dentro de tu contenedor de producción activo:
 ```bash
