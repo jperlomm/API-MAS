@@ -12,6 +12,8 @@ Abre una terminal en tu **PC local de desarrollo** y ejecuta estos comandos para
 # 1. Copiar el dump comprimido de la base legacy:
 scp "/home/usuario/Documentos/antigravity/SPI-V1/POSTREGRES LEGACY/spi40db.dump.gz" usuario@192.168.2.20:/tmp/
 
+scp "/home/usuario/Descargas/backup-spi-14/var/backups/var/lib/pgsql/spi40db.dump.gz" usuario@192.168.2.20:/tmp/
+
 # 2. Copiar el script de migración ETL:
 scp "/home/usuario/Documentos/antigravity/SPI-V1/postgres_migration_complete.sql" usuario@192.168.2.20:/tmp/
 ```
@@ -105,11 +107,13 @@ docker exec -it isp-postgres psql -U postgres -d dhcp -c "DROP SCHEMA IF EXISTS 
 
 3. **Restaura el nuevo dump y ejecuta la migración del nuevo CMTS:**
    ```bash
-   # Restaurar el nuevo backup:
+   # 1. Restaurar el nuevo backup en la base temporal:
    gunzip -c /tmp/spi40db.dump.gz | docker exec -i pg_legacy_temp psql -U postgres -d spi_legacy
 
-   # Inyectar ETL y migrar el nuevo CMTS:
+   # 2. (Opcional) Re-inyectar ETL si se agregaron paquetes/localidades nuevas en el nuevo backup:
    docker exec -i isp-postgres psql -U postgres -d dhcp < /tmp/postgres_migration_complete.sql
+
+   # 3. Migrar directamente el nuevo CMTS:
    docker exec -it isp-postgres psql -U postgres -d dhcp -c "SELECT * FROM admin.migrar_datos_por_cmts(ID_NUEVO_CMTS);"
    ```
-   *(Los abonados y cablemódems previamente migrados no se duplicarán gracias a la protección automática `ON CONFLICT DO NOTHING`).*
+   *(Como la función `migrar_datos_por_cmts()` ya está guardada en la base de datos de producción, solo necesitas correr la instrucción `SELECT` para migrar los nuevos abonados. Los clientes y equipos previamente migrados no se duplicarán gracias a la protección `ON CONFLICT DO NOTHING`).*
