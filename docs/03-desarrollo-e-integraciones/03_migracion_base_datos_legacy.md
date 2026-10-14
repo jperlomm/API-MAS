@@ -6,16 +6,20 @@ Este manual resume el procedimiento real, optimizado e ininterrumpido utilizado 
 
 ## 🚀 PROCESO DE MIGRACIÓN PASO A PASO
 
-### 📦 PASO 1: Copiar el dump comprimido al Servidor (Desde tu PC Local)
-Abre una terminal en tu **PC local de desarrollo** y ejecuta este comando para subir el archivo comprimido a la carpeta temporal `/tmp/` del servidor (tardará apenas un par de segundos):
+### 📦 PASO 1: Copiar el dump y el script SQL al Servidor (Desde tu PC Local)
+Abre una terminal en tu **PC local de desarrollo** y ejecuta estos comandos para subir la base de datos y el script ETL a la carpeta temporal `/tmp/` del servidor:
 ```bash
+# 1. Copiar el dump comprimido de la base legacy:
 scp "/home/usuario/Documentos/antigravity/SPI-V1/POSTREGRES LEGACY/spi40db.dump.gz" usuario@192.168.2.106:/tmp/
+
+# 2. Copiar el script de migración ETL:
+scp "/home/usuario/Documentos/antigravity/SPI-V1/postgres_migration_complete.sql" usuario@192.168.2.106:/tmp/
 ```
 
 ---
 
 ### 🖥️ PASO 2: Conectarse al Servidor por SSH
-Una vez subido el archivo, conéctate a la consola de tu servidor Proxmox/Debian desde tu PC local:
+Una vez subidos los archivos, conéctate a la consola de tu servidor Proxmox/Debian desde tu PC local:
 ```bash
 ssh usuario@192.168.2.106
 ```
@@ -47,15 +51,11 @@ gunzip -c /tmp/spi40db.dump.gz | docker exec -i pg_legacy_temp psql -U postgres 
 ---
 
 ### 🖥️ PASO 5: Cargar ETL, Migrar CMTS y realizar la Limpieza
-Una vez restaurados todos tus datos sandbox en el puerto `5435`, realizamos el despliegue del script de migración, la corrida de datos dinámica y eliminamos los recursos temporales:
+Una vez restaurados todos tus datos sandbox en el puerto `5435`, realizamos el despliegue del script de migración desde `/tmp/`, la corrida de datos dinámica y eliminamos los recursos temporales:
 
 #### 1. Inyectar el archivo de funciones ETL dentro de tu contenedor de producción activo:
 ```bash
-# Si estás parado en la raíz del repositorio (/home/usuario/Documentos/antigravity/SPI-V1):
-docker exec -i isp-postgres psql -U postgres -d dhcp < postgres_migration_complete.sql
-
-# O especificando la ruta absoluta completa:
-docker exec -i isp-postgres psql -U postgres -d dhcp < /home/usuario/Documentos/antigravity/SPI-V1/postgres_migration_complete.sql
+docker exec -i isp-postgres psql -U postgres -d dhcp < /tmp/postgres_migration_complete.sql
 ```
 *(Este script conecta automáticamente el FDW al puerto `5435`, migra datos estructurales de bajo cambio y registra las funciones ETL).*
 
