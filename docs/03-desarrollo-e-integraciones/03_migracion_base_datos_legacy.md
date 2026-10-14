@@ -88,3 +88,28 @@ docker exec -it isp-postgres psql -U postgres -d dhcp -c "DROP SCHEMA IF EXISTS 
 1. **Importación Automática de Planes (Fase 1):** El script ETL importa automáticamente todos los planes/paquetes desde el sistema legacy (`com_packs`) a la nueva tabla `admin.paquetes`. **No tienes que crear los planes manualmente.**
 2. **Cruce por Nombre de Plan (Fase 2):** Al migrar las suscripciones de los clientes (`admin.servicios_clientes`), el script asocia cada servicio vinculándolo mediante la coincidencia del **Nombre del Plan** (`target_pack.nombre = source_pack.descripcion`).
 3. **Coincidencia de IDs:** No es obligatorio que conserven el mismo ID numérico, ya que la relación se garantiza de forma segura mediante la coincidencia del nombre comercial del paquete.
+
+### ❓ ¿Puedo cargar otro backup legacy más adelante para migrar más CMTSs?
+**SÍ, el proceso es 100% reutilizable, progresivo e idempotente.** Si en el futuro recibes un nuevo backup o decides migrar otra localidad/nodo:
+
+1. **Sube el nuevo dump a `/tmp/`:**
+   ```bash
+   scp "/ruta/al/nuevo_dump.dump.gz" usuario@192.168.2.20:/tmp/spi40db.dump.gz
+   ```
+
+2. **Inicia o limpia la base temporal `spi_legacy` en el puerto 5435:**
+   ```bash
+   docker start pg_legacy_temp 2>/dev/null || docker run --name pg_legacy_temp -e POSTGRES_DB=spi_legacy -e POSTGRES_PASSWORD=P0stgr3s_legacy_pwd -p 5435:5432 -d postgres:15
+   docker exec -i pg_legacy_temp psql -U postgres -c "DROP DATABASE IF EXISTS spi_legacy; CREATE DATABASE spi_legacy;"
+   ```
+
+3. **Restaura el nuevo dump y ejecuta la migración del nuevo CMTS:**
+   ```bash
+   # Restaurar el nuevo backup:
+   gunzip -c /tmp/spi40db.dump.gz | docker exec -i pg_legacy_temp psql -U postgres -d spi_legacy
+
+   # Inyectar ETL y migrar el nuevo CMTS:
+   docker exec -i isp-postgres psql -U postgres -d dhcp < /tmp/postgres_migration_complete.sql
+   docker exec -it isp-postgres psql -U postgres -d dhcp -c "SELECT * FROM admin.migrar_datos_por_cmts(ID_NUEVO_CMTS);"
+   ```
+   *(Los abonados y cablemódems previamente migrados no se duplicarán gracias a la protección automática `ON CONFLICT DO NOTHING`).*
