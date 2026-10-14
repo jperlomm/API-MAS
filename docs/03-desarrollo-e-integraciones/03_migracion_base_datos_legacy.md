@@ -1,6 +1,21 @@
 # 🗄️ GUÍA RÁPIDA: MIGRACIÓN DE BASE DE DATOS EN 5 PASOS (SPI MAS)
+
+Este manual resume el procedimiento real, optimizado e ininterrumpido utilizado para migrar la base de datos histórica (`spi_legacy` / SPI 4.0) hacia tu nuevo servidor de producción sin saturar recursos de red o disco.
+
 ---
-Este manual resume el procedimiento real, optimizado e ininterrumpido utilizado para migrar la base de datos histórica hacia tu nuevo servidor de producción sin saturar recursos de red o disco.
+
+## 🛠️ PASO PREVIO: Extracción de un Backup Completo `.tar.bz2` (Opcional)
+
+Si tu copia de seguridad histórica proviene de un backup completo comprimido del sistema SPI 4.0 (ej. `backup_spi40_clucellas_2026-05-21_13.14.tar.bz2`), primero debes extraer el dump de la base de datos PostgreSQL:
+
+```bash
+# 1. Descomprimir el archivo tar.bz2 en tu equipo de desarrollo o servidor:
+tar -jxvf backup_spi40_clucellas_2026-05-21_13.14.tar.bz2
+
+# 2. Identificar el dump de la DB extraído (ej. spi40db.dump o dump.sql) y comprimir con gzip:
+gzip spi40db.dump
+```
+*(Esto generará el archivo `spi40db.dump.gz` requerido en el Paso 1).*
 
 ---
 
@@ -73,3 +88,12 @@ docker stop pg_legacy_temp && docker rm pg_legacy_temp
 # (Opcional) Borrar rastro de conexión FDW dentro de producción
 docker exec -it isp-postgres psql -U postgres -d dhcp -c "DROP SCHEMA IF EXISTS legacy CASCADE; DROP SERVER IF EXISTS legacy_server CASCADE;"
 ```
+
+---
+
+## 📌 PREGUNTAS FRECUENTES DE LA MIGRACIÓN
+
+### ❓ ¿Cómo se asocian los Clientes y Servicios con los Planes Comerciales?
+1. **Importación Automática de Planes (Fase 1):** El script ETL importa automáticamente todos los planes/paquetes desde el sistema legacy (`com_packs`) a la nueva tabla `admin.paquetes`. **No tienes que crear los planes manualmente.**
+2. **Cruce por Nombre de Plan (Fase 2):** Al migrar las suscripciones de los clientes (`admin.servicios_clientes`), el script asocia cada servicio vinculándolo mediante la coincidencia del **Nombre del Plan** (`target_pack.nombre = source_pack.descripcion`).
+3. **Coincidencia de IDs:** No es obligatorio que conserven el mismo ID numérico, ya que la relación se garantiza de forma segura mediante la coincidencia del nombre comercial del paquete.
