@@ -151,7 +151,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> GenerateLongLivedToken([FromBody] GenerateTokenRequest? request)
     {
         var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(idClaim) || !int.TryParse(idClaim, out var userId))
+        if (string.IsNullOrEmpty(idClaim) || !Guid.TryParse(idClaim, out var userId))
         {
             return Unauthorized(new { Error = "Usuario no identificado" });
         }
