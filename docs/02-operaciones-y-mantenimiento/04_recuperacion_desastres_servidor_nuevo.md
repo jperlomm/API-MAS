@@ -33,6 +33,8 @@ Si estás utilizando **Proxmox VE**, ejecuta el script de aprovisionamiento auto
 
 Tienes dos opciones sumamente sencillas para transferir todo el proyecto a la nueva máquina virtual:
 
+ANTES CREAR ARCHIVO .env en /spi en el server de destino
+
 ### 🟢 Opción A: Usando `./deploy.sh` desde tu PC local de desarrollo (La más rápida y fácil)
 Desde la terminal de tu computadora de desarrollo, simplemente ejecuta tu script de despliegue indicando la IP de la nueva VM:
 ```bash
@@ -139,6 +141,8 @@ Para evitar cualquier error humano o de tablas duplicadas, utiliza el script **`
 cd ~/spi
 ./backups_system/restore_backup.sh ~/spi/backups/dhcp_prod_2026-09-23.sql
 ```
+./backups_system/restore_backup.sh /backups/dhcp_prod_2026-10-08.sql
+
 
 *(El proceso automatizado ejecutará la limpieza, importación, re-alineación de secuencias de auto-incremento y reinicio de contenedores en menos de 10 segundos).*
 
@@ -166,6 +170,15 @@ cd ~/spi
    - Estado de la API: `http://192.168.2.107:8000/api/health`
 
 ---
+
+## Configurar Telegram en db
+
+docker exec -i isp-postgres psql -U postgres -d dhcp -c "SELECT * FROM admin.configuraciones WHERE clave LIKE 'telegram%';"
+
+docker exec -i isp-postgres psql -U postgres -d dhcp -c "
+UPDATE admin.configuraciones SET valor = '5265243375:AAFZjUcDdWgAmWtKhvlkftfDUalnzf9PVTU' WHERE clave = 'telegram_bot_token';
+UPDATE admin.configuraciones SET valor = '-5153013922' WHERE clave = 'telegram_chat_id';
+"
 
 ## 🆘 CHECKLIST DE RESOLUCIÓN DE PROBLEMAS EN EMERGENCIA
 

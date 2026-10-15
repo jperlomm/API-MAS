@@ -73,10 +73,22 @@ export interface CMTS {
   comunidadSnmp?: string | null;
 }
 
+export interface Bundle {
+  id?: number;
+  idCmts: number;
+  cmtsNombre?: string;
+  nombre: string;
+  ipGiaddr: string;
+  descripcion?: string | null;
+}
+
 export interface Subred {
   id?: number;
   idCmts: number;
   cmts?: string;
+  idBundle?: number | null;
+  bundleNombre?: string | null;
+  ipGiaddr?: string | null;
   nombre: string;
   cidr: string;
   gateway: string;

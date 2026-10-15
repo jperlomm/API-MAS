@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Network, Plus, Trash2, Edit } from 'lucide-react';
-import { apiFetch, CMTS, Subred, Pool, Paquete } from '../utils/api';
+import { Network, Plus, Trash2, Edit, Layers } from 'lucide-react';
+import { apiFetch, CMTS, Bundle, Subred, Pool, Paquete } from '../utils/api';
 
 interface RedViewProps {
   showToast: (msg: string, type: 'success' | 'error') => void;
@@ -56,6 +56,7 @@ function getAvailableGaps(firstUsable: number, lastUsable: number, occupied: { s
 
 export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
   const [cmtsList, setCmtsList] = useState<CMTS[]>([]);
+  const [bundleList, setBundleList] = useState<Bundle[]>([]);
   const [subredList, setSubredList] = useState<Subred[]>([]);
   const [poolList, setPoolList] = useState<Pool[]>([]);
   const [paqueteList, setPaqueteList] = useState<Paquete[]>([]);
@@ -66,7 +67,13 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
   const [cmtsIp, setCmtsIp] = useState<string>('');
   const [cmtsSnmp, setCmtsSnmp] = useState<string>('');
 
+  const [bundleIdCmts, setBundleIdCmts] = useState<string>('');
+  const [bundleNombre, setBundleNombre] = useState<string>('');
+  const [bundleGiaddr, setBundleGiaddr] = useState<string>('');
+  const [bundleDesc, setBundleDesc] = useState<string>('');
+
   const [subIdCmts, setSubIdCmts] = useState<string>('');
+  const [subIdBundle, setSubIdBundle] = useState<string>('');
   const [subNombre, setSubNombre] = useState<string>('');
   const [subCidr, setSubCidr] = useState<string>('');
   const [subGw, setSubGateway] = useState<string>('');
@@ -97,6 +104,7 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
 
   // Editing States
   const [editingCmtsId, setEditingCmtsId] = useState<number | null>(null);
+  const [editingBundleId, setEditingBundleId] = useState<number | null>(null);
   const [editingSubredId, setEditingSubredId] = useState<number | null>(null);
   const [editingPoolId, setEditingPoolId] = useState<number | null>(null);
   const [editingPaqueteId, setEditingPaqueteId] = useState<number | null>(null);
@@ -134,12 +142,14 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
   const loadData = async () => {
     setLoading(true);
     const resC = await apiFetch<CMTS[]>('/api/red/cmts');
+    const resBnd = await apiFetch<Bundle[]>('/api/red/bundles');
     const resS = await apiFetch<Subred[]>('/api/red/subredes');
     const resPo = await apiFetch<Pool[]>('/api/red/pools');
     const resPa = await apiFetch<Paquete[]>('/api/red/paquetes');
     const resB = await apiFetch<any[]>('/api/bootfiles');
 
     if (resC.success && resC.data) setCmtsList(resC.data);
+    if (resBnd.success && resBnd.data) setBundleList(resBnd.data);
     if (resS.success && resS.data) setSubredList(resS.data);
     if (resPo.success && resPo.data) setPoolList(resPo.data);
     if (resPa.success && resPa.data) setPaqueteList(resPa.data);
@@ -243,7 +253,7 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
   };
 
   const handleDeleteCmts = async (id: number) => {
-    if (!window.confirm('¿Eliminar CMTS? Se perderán subredes hijas si no se borran primero.')) return;
+    if (!window.confirm('¿Eliminar CMTS? Se perderán subredes e interfaces asociadas.')) return;
     const res = await apiFetch(`/api/red/cmts/${id}`, { method: 'DELETE' });
     if (res.success) {
       showToast('CMTS removido.', 'success');
@@ -254,11 +264,73 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
     }
   };
 
+  // Bundle Handlers
+  const handleCreateBundle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload: Bundle = {
+      idCmts: parseInt(bundleIdCmts),
+      nombre: bundleNombre.trim(),
+      ipGiaddr: bundleGiaddr.trim(),
+      descripcion: bundleDesc.trim() || null,
+    };
+    if (editingBundleId) {
+      const res = await apiFetch(`/api/red/bundles/${editingBundleId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      if (res.success) {
+        showToast('Bundle / Gateway de Relay actualizado.', 'success');
+        handleCancelEditBundle();
+        loadData();
+      } else {
+        showToast(res.error || 'Error al actualizar bundle.', 'error');
+      }
+    } else {
+      const res = await apiFetch('/api/red/bundles', { method: 'POST', body: JSON.stringify(payload) });
+      if (res.success) {
+        showToast('Bundle / Gateway de Relay creado con éxito.', 'success');
+        setBundleIdCmts('');
+        setBundleNombre('');
+        setBundleGiaddr('');
+        setBundleDesc('');
+        loadData();
+      } else {
+        showToast(res.error || 'Error al guardar bundle.', 'error');
+      }
+    }
+  };
+
+  const handleEditBundleClick = (b: Bundle) => {
+    setEditingBundleId(b.id!);
+    setBundleIdCmts(String(b.idCmts));
+    setBundleNombre(b.nombre);
+    setBundleGiaddr(b.ipGiaddr);
+    setBundleDesc(b.descripcion || '');
+  };
+
+  const handleCancelEditBundle = () => {
+    setEditingBundleId(null);
+    setBundleIdCmts('');
+    setBundleNombre('');
+    setBundleGiaddr('');
+    setBundleDesc('');
+  };
+
+  const handleDeleteBundle = async (id: number) => {
+    if (!window.confirm('¿Desea borrar este Bundle? Podría desafectar subredes asignadas.')) return;
+    const res = await apiFetch(`/api/red/bundles/${id}`, { method: 'DELETE' });
+    if (res.success) {
+      showToast('Bundle removido.', 'success');
+      if (editingBundleId === id) handleCancelEditBundle();
+      loadData();
+    } else {
+      showToast(res.error || 'No se puede eliminar bundle con subredes activas.', 'error');
+    }
+  };
+
   // Subred Handlers
   const handleCreateSubred = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload: Subred = {
       idCmts: parseInt(subIdCmts),
+      idBundle: subIdBundle ? parseInt(subIdBundle) : null,
       nombre: subNombre.trim(),
       cidr: subCidr.trim(),
       gateway: subGw.trim(),
@@ -278,6 +350,7 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
       if (res.success) {
         showToast('Subred asignada con éxito.', 'success');
         setSubIdCmts('');
+        setSubIdBundle('');
         setSubNombre('');
         setSubCidr('');
         setSubGateway('');
@@ -292,6 +365,7 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
   const handleEditSubredClick = (s: Subred) => {
     setEditingSubredId(s.id!);
     setSubIdCmts(String(s.idCmts));
+    setSubIdBundle(s.idBundle ? String(s.idBundle) : '');
     setSubNombre(s.nombre);
     setSubCidr(s.cidr);
     setSubGateway(s.gateway);
@@ -301,6 +375,7 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
   const handleCancelEditSubred = () => {
     setEditingSubredId(null);
     setSubIdCmts('');
+    setSubIdBundle('');
     setSubNombre('');
     setSubCidr('');
     setSubGateway('');
@@ -505,70 +580,144 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
       </div>
 
       {activeSubTab === 'cmts' && (
-        <div className="animate-slide-up" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
+        <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '32px' }}>
           {/* SECCIÓN 1: CMTSs */}
-          <div className="panel" style={{ marginBottom: 0 }}>
-            <div className="panel-header">
-              <div className="panel-title">
-                {editingCmtsId ? <Edit size={16} /> : <Plus size={16} />} {editingCmtsId ? "Modificar Nodo CMTS" : "Nuevo Nodo CMTS"}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div className="panel" style={{ marginBottom: 0 }}>
+              <div className="panel-header">
+                <div className="panel-title">
+                  {editingCmtsId ? <Edit size={16} /> : <Plus size={16} />} {editingCmtsId ? "Modificar Nodo CMTS" : "Nuevo Nodo CMTS"}
+                </div>
+              </div>
+              <form onSubmit={handleCreateCmts}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="form-group">
+                    <label>Nombre del Nodo CMTS *</label>
+                    <input type="text" placeholder="Ej: CMTS Mendoza Centro" value={cmtsNombre} onChange={e => setCmtsNombre(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label>IP de Gestión de Control *</label>
+                    <input type="text" placeholder="Ej: 10.0.0.1" value={cmtsIp} onChange={e => setCmtsIp(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Comunidad SNMP v2c *</label>
+                    <input type="text" placeholder="Ej: public" value={cmtsSnmp} onChange={e => setCmtsSnmp(e.target.value)} required />
+                  </div>
+                </div>
+                {editingCmtsId ? (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                    <button type="submit" className="btn btn-primary">Guardar Cambios</button>
+                    <button type="button" className="btn" onClick={handleCancelEditCmts}>Cancelar</button>
+                  </div>
+                ) : (
+                  <button type="submit" className="btn btn-primary" style={{ marginTop: '16px' }}>Crear Nodo CMTS</button>
+                )}
+              </form>
+            </div>
+
+            <div className="panel" style={{ marginBottom: 0, display: 'flex', flexDirection: 'column' }}>
+              <div className="panel-header"><div className="panel-title">Nodos CMTS Activos</div></div>
+              <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nombre</th>
+                      <th>IP Gestión</th>
+                      <th style={{ textAlign: 'center', width: '120px' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? <tr><td colSpan={4}>Cargando...</td></tr> : cmtsList.length === 0 ? <tr><td colSpan={4} style={{ opacity: 0.5 }}>Ninguno.</td></tr> : cmtsList.map(c => (
+                      <tr key={c.id}>
+                        <td><strong>{c.id}</strong></td>
+                        <td>{c.nombre}</td>
+                        <td><code>{c.ipControl}</code></td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditCmtsClick(c)} className="btn btn-warning" style={{ padding: '4px 8px' }} title="Editar"><Edit size={12} /></button>
+                            <button onClick={() => handleDeleteCmts(c.id!)} className="btn btn-danger" style={{ padding: '4px 8px' }} title="Eliminar"><Trash2 size={12} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-            <form onSubmit={handleCreateCmts}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="form-group">
-                  <label>Nombre del Nodo CMTS *</label>
-                  <input type="text" placeholder="Ej: CMTS Mendoza Centro" value={cmtsNombre} onChange={e => setCmtsNombre(e.target.value)} required />
-                </div>
-                <div className="form-group">
-                  <label>IP de Gestión de Control *</label>
-                  <input type="text" placeholder="Ej: 10.0.0.1" value={cmtsIp} onChange={e => setCmtsIp(e.target.value)} required />
-                </div>
-                <div className="form-group">
-                  <label>Comunidad SNMP v2c *</label>
-                  <input type="text" placeholder="Ej: public" value={cmtsSnmp} onChange={e => setCmtsSnmp(e.target.value)} required />
-                </div>
-              </div>
-              {editingCmtsId ? (
-                <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                  <button type="submit" className="btn btn-primary">Guardar Cambios</button>
-                  <button type="button" className="btn" onClick={handleCancelEditCmts}>Cancelar</button>
-                </div>
-              ) : (
-                <button type="submit" className="btn btn-primary" style={{ marginTop: '16px' }}>Crear Nodo CMTS</button>
-              )}
-            </form>
           </div>
 
-          <div className="panel" style={{ marginBottom: 0, display: 'flex', flexDirection: 'column' }}>
-            <div className="panel-header"><div className="panel-title">Nodos CMTS Activos</div></div>
-            <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Nombre</th>
-                    <th>IP Gestión</th>
-                    <th style={{ textAlign: 'center', width: '120px' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? <tr><td colSpan={4}>Cargando...</td></tr> : cmtsList.length === 0 ? <tr><td colSpan={4} style={{ opacity: 0.5 }}>Ninguno.</td></tr> : cmtsList.map(c => (
-                    <tr key={c.id}>
-                      <td><strong>{c.id}</strong></td>
-                      <td>{c.nombre}</td>
-                      <td><code>{c.ipControl}</code></td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          <button onClick={() => handleEditCmtsClick(c)} className="btn btn-warning" style={{ padding: '4px 8px' }} title="Editar"><Edit size={12} /></button>
-                          <button onClick={() => handleDeleteCmts(c.id!)} className="btn btn-danger" style={{ padding: '4px 8px' }} title="Eliminar"><Trash2 size={12} /></button>
-                        </div>
-                      </td>
+          {/* SECCIÓN BUNDLES / BUNDLE GIADDR INTERFACES */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div className="panel" style={{ marginBottom: 0 }}>
+              <div className="panel-header">
+                <div className="panel-title">
+                  <Layers size={16} /> {editingBundleId ? "Modificar Bundle (Primary Relay GIADDR)" : "Nuevo Bundle Interface (ipbundle)"}
+                </div>
+              </div>
+              <form onSubmit={handleCreateBundle}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="form-group">
+                    <label>CMTS Perteneciente *</label>
+                    <select value={bundleIdCmts} onChange={e => setBundleIdCmts(e.target.value)} required>
+                      <option value="">-- Seleccionar CMTS --</option>
+                      {cmtsList.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Nombre del Bundle *</label>
+                    <input type="text" placeholder="Ej: ipbundle1" value={bundleNombre} onChange={e => setBundleNombre(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label>IP Primary Relay GIADDR *</label>
+                    <input type="text" placeholder="Ej: 10.200.60.1" value={bundleGiaddr} onChange={e => setBundleGiaddr(e.target.value)} required />
+                  </div>
+                </div>
+                {editingBundleId ? (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                    <button type="submit" className="btn btn-primary">Guardar Cambios</button>
+                    <button type="button" className="btn" onClick={handleCancelEditBundle}>Cancelar</button>
+                  </div>
+                ) : (
+                  <button type="submit" className="btn btn-primary" style={{ marginTop: '16px' }}>Crear Bundle</button>
+                )}
+              </form>
+            </div>
+
+            <div className="panel" style={{ marginBottom: 0, display: 'flex', flexDirection: 'column' }}>
+              <div className="panel-header"><div className="panel-title">Bundles Configurados por CMTS</div></div>
+              <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>CMTS</th>
+                      <th>Bundle</th>
+                      <th>Primary GIADDR</th>
+                      <th style={{ textAlign: 'center', width: '100px' }}>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {loading ? <tr><td colSpan={5}>Cargando...</td></tr> : bundleList.length === 0 ? <tr><td colSpan={5} style={{ opacity: 0.5 }}>Ningún bundle registrado.</td></tr> : bundleList.map(b => (
+                      <tr key={b.id}>
+                        <td><strong>{b.id}</strong></td>
+                        <td>{b.cmtsNombre}</td>
+                        <td><b>{b.nombre}</b></td>
+                        <td><code>{b.ipGiaddr}</code></td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditBundleClick(b)} className="btn btn-warning" style={{ padding: '4px 8px' }} title="Editar"><Edit size={12} /></button>
+                            <button onClick={() => handleDeleteBundle(b.id!)} className="btn btn-danger" style={{ padding: '4px 8px' }} title="Eliminar"><Trash2 size={12} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
+
         </div>
       )}
 
@@ -636,9 +785,21 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div className="form-group">
                     <label>Asociar a CMTS *</label>
-                    <select value={subIdCmts} onChange={e => setSubIdCmts(e.target.value)} required>
+                    <select value={subIdCmts} onChange={e => {
+                      setSubIdCmts(e.target.value);
+                      setSubIdBundle('');
+                    }} required>
                       <option value="">-- Seleccionar CMTS --</option>
                       {cmtsList.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Asociar a Bundle (Primary GIADDR Relay)</label>
+                    <select value={subIdBundle} onChange={e => setSubIdBundle(e.target.value)}>
+                      <option value="">-- Sin Bundle (Subred Plana) --</option>
+                      {bundleList.filter(b => !subIdCmts || String(b.idCmts) === subIdCmts).map(b => (
+                        <option key={b.id} value={b.id}>{b.nombre} (Relay: {b.ipGiaddr}) - CMTS: {b.cmtsNombre}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="form-group">
@@ -681,7 +842,7 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
                       <th>ID</th>
                       <th>Datos de Subred</th>
                       <th>Tipo</th>
-                      <th>CMTS Asociado</th>
+                      <th>CMTS / Bundle GIADDR</th>
                       <th style={{ textAlign: 'center', width: '100px' }}>Acciones</th>
                     </tr>
                   </thead>
@@ -700,7 +861,16 @@ export const RedView: React.FC<RedViewProps> = ({ showToast }) => {
                               {s.tipo}
                             </span>
                           </td>
-                          <td>{parentCmts ? parentCmts.nombre : <span style={{ opacity: 0.3 }}>N/A</span>}</td>
+                          <td>
+                            <div>{parentCmts ? parentCmts.nombre : <span style={{ opacity: 0.3 }}>N/A</span>}</div>
+                            {s.bundleNombre ? (
+                              <div style={{ fontSize: '11px', color: 'var(--primary-color)' }}>
+                                <b>{s.bundleNombre}</b> <code>({s.ipGiaddr})</code>
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: '11px', opacity: 0.5 }}>Subred Plana</div>
+                            )}
+                          </td>
                           <td style={{ textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                               <button onClick={() => handleEditSubredClick(s)} className="btn btn-warning" style={{ padding: '4px 8px' }} title="Editar"><Edit size={12} /></button>

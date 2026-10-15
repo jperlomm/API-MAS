@@ -21,9 +21,18 @@ namespace SmiApi.Controllers
             public string? Descripcion { get; set; }
         }
 
+        public class BundleCreateDto
+        {
+            public int IdCmts { get; set; }
+            public string Nombre { get; set; } = null!;
+            public string IpGiaddr { get; set; } = null!;
+            public string? Descripcion { get; set; }
+        }
+
         public class SubredCreateDto
         {
             public int IdCmts { get; set; }
+            public int? IdBundle { get; set; }
             public string Nombre { get; set; } = null!;
             public string Cidr { get; set; } = null!;
             public string Gateway { get; set; } = null!;
@@ -84,6 +93,39 @@ namespace SmiApi.Controllers
             }
         }
 
+        // 1.1 LISTAR BUNDLES (GET /api/red/bundles)
+        [HttpGet("bundles")]
+        public async Task<IActionResult> GetBundlesList()
+        {
+            try
+            {
+                var list = new List<object>();
+                await using var cmd = _dataSource.CreateCommand(@"
+                    SELECT b.id, b.id_cmts, c.nombre AS cmts_nombre, b.nombre, host(b.ip_giaddr) AS ip_giaddr, b.descripcion 
+                    FROM admin.bundles b
+                    JOIN admin.cmts c ON b.id_cmts = c.id
+                    ORDER BY b.id;");
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    list.Add(new
+                    {
+                        Id = reader.GetInt32(0),
+                        IdCmts = reader.GetInt32(1),
+                        CmtsNombre = reader.GetString(2),
+                        Nombre = reader.GetString(3),
+                        IpGiaddr = reader.GetString(4),
+                        Descripcion = reader.IsDBNull(5) ? null : reader.GetString(5)
+                    });
+                }
+                return Ok(list);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = $"Error al obtener lista de bundles: {ex.Message}" });
+            }
+        }
+
         // 2. LISTAR SUBREDES (GET /api/red/subredes)
         [HttpGet("subredes")]
         public async Task<IActionResult> GetSubredesList()
@@ -92,9 +134,11 @@ namespace SmiApi.Controllers
             {
                 var list = new List<object>();
                 await using var cmd = _dataSource.CreateCommand(@"
-                    SELECT s.id, s.id_cmts, c.nombre AS cmts_nombre, s.nombre, s.cidr::text, s.gateway::text, s.tipo, s.descripcion 
+                    SELECT s.id, s.id_cmts, c.nombre AS cmts_nombre, s.nombre, s.cidr::text, s.gateway::text, s.tipo, s.descripcion,
+                           s.id_bundle, b.nombre AS bundle_nombre, host(b.ip_giaddr) AS ip_giaddr
                     FROM admin.subredes s
                     JOIN admin.cmts c ON s.id_cmts = c.id
+                    LEFT JOIN admin.bundles b ON s.id_bundle = b.id
                     ORDER BY s.id;");
                 await using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
@@ -108,7 +152,10 @@ namespace SmiApi.Controllers
                         Cidr = reader.GetString(4),
                         Gateway = reader.GetString(5),
                         Tipo = reader.GetString(6),
-                        Descripcion = reader.IsDBNull(7) ? null : reader.GetString(7)
+                        Descripcion = reader.IsDBNull(7) ? null : reader.GetString(7),
+                        IdBundle = reader.IsDBNull(8) ? (int?)null : reader.GetInt32(8),
+                        BundleNombre = reader.IsDBNull(9) ? null : reader.GetString(9),
+                        IpGiaddr = reader.IsDBNull(10) ? null : reader.GetString(10)
                     });
                 }
                 return Ok(list);
@@ -233,6 +280,35 @@ namespace SmiApi.Controllers
             }
         }
 
+        // --- BUNDLES ---
+        [HttpPost("bundles")]
+        public async Task<IActionResult> CreateBundle([FromBody] BundleCreateDto dto)
+        {
+            try
+            {
+                await using var cmd = _dataSource.CreateCommand(@"
+                    INSERT INTO admin.bundles (id_cmts, nombre, ip_giaddr, descripcion)
+                    VALUES ($1, $2, $3::inet, $4)
+                    RETURNING id;");
+                cmd.Parameters.AddWithValue(dto.IdCmts);
+                cmd.Parameters.AddWithValue(dto.Nombre.Trim());
+                cmd.Parameters.AddWithValue(dto.IpGiaddr.Trim());
+                cmd.Parameters.AddWithValue((object?)dto.Descripcion?.Trim() ?? DBNull.Value);
+
+                var id = await cmd.ExecuteScalarAsync();
+                await SyncKeaConfigAsync(_dataSource);
+                return StatusCode(201, new { Id = id, Message = "Bundle registrado con éxito" });
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "23505")
+            {
+                return BadRequest(new { Error = $"Ya existe un Bundle registrado con la IP GIADDR '{dto.IpGiaddr}'. Si desea modificarlo, utilice la opción de editar en la lista de bundles existentes." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = $"Error al registrar bundle: {ex.Message}" });
+            }
+        }
+
         // --- SUBREDES ---
         [HttpPost("subredes")]
         public async Task<IActionResult> CreateSubred([FromBody] SubredCreateDto dto)
@@ -245,15 +321,16 @@ namespace SmiApi.Controllers
             try
             {
                 await using var cmd = _dataSource.CreateCommand(@"
-                    INSERT INTO admin.subredes (id_cmts, nombre, cidr, gateway, tipo, descripcion)
-                    VALUES ($1, $2, network($3::inet), $4::inet, $5, $6)
+                    INSERT INTO admin.subredes (id_cmts, id_bundle, nombre, cidr, gateway, tipo, descripcion)
+                    VALUES ($1, $2, $3, network($4::inet), $5::inet, $6, $7)
                     RETURNING id;");
                 cmd.Parameters.AddWithValue(dto.IdCmts);
-                cmd.Parameters.AddWithValue(dto.Nombre);
-                cmd.Parameters.AddWithValue(dto.Cidr);
-                cmd.Parameters.AddWithValue(dto.Gateway);
-                cmd.Parameters.AddWithValue(dto.Tipo);
-                cmd.Parameters.AddWithValue((object?)dto.Descripcion ?? DBNull.Value);
+                cmd.Parameters.AddWithValue((object?)dto.IdBundle ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(dto.Nombre.Trim());
+                cmd.Parameters.AddWithValue(dto.Cidr.Trim());
+                cmd.Parameters.AddWithValue(dto.Gateway.Trim());
+                cmd.Parameters.AddWithValue(dto.Tipo.Trim());
+                cmd.Parameters.AddWithValue((object?)dto.Descripcion?.Trim() ?? DBNull.Value);
 
                 var id = await cmd.ExecuteScalarAsync();
                 await SyncKeaConfigAsync(_dataSource);
@@ -564,6 +641,59 @@ namespace SmiApi.Controllers
             }
         }
 
+        [HttpPut("bundles/{id}")]
+        public async Task<IActionResult> UpdateBundle(int id, [FromBody] BundleCreateDto dto)
+        {
+            try
+            {
+                await using var cmd = _dataSource.CreateCommand(@"
+                    UPDATE admin.bundles 
+                    SET id_cmts = $1, nombre = $2, ip_giaddr = $3::inet, descripcion = $4
+                    WHERE id = $5
+                    RETURNING id;");
+                cmd.Parameters.AddWithValue(dto.IdCmts);
+                cmd.Parameters.AddWithValue(dto.Nombre.Trim());
+                cmd.Parameters.AddWithValue(dto.IpGiaddr.Trim());
+                cmd.Parameters.AddWithValue((object?)dto.Descripcion?.Trim() ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(id);
+
+                var result = await cmd.ExecuteScalarAsync();
+                if (result == null) return NotFound(new { Error = "El bundle solicitado no existe." });
+                await SyncKeaConfigAsync(_dataSource);
+                return Ok(new { Id = id, Message = "Bundle actualizado con éxito." });
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "23505")
+            {
+                return BadRequest(new { Error = $"Ya existe otro Bundle registrado con la IP GIADDR '{dto.IpGiaddr}'." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = $"Error al actualizar bundle: {ex.Message}" });
+            }
+        }
+
+        [HttpDelete("bundles/{id}")]
+        public async Task<IActionResult> DeleteBundle(int id)
+        {
+            try
+            {
+                await using var cmd = _dataSource.CreateCommand("DELETE FROM admin.bundles WHERE id = $1 RETURNING id;");
+                cmd.Parameters.AddWithValue(id);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result == null) return NotFound(new { Error = "El bundle solicitado no existe." });
+                await SyncKeaConfigAsync(_dataSource);
+                return Ok(new { Id = id, Message = "Bundle eliminado con éxito." });
+            }
+            catch (PostgresException ex) when (ex.SqlState == "23503")
+            {
+                return BadRequest(new { Error = "No se puede eliminar este bundle porque tiene subredes o servicios asociados." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = $"Error al eliminar bundle: {ex.Message}" });
+            }
+        }
+
         [HttpPut("subredes/{id}")]
         public async Task<IActionResult> UpdateSubred(int id, [FromBody] SubredCreateDto dto)
         {
@@ -588,10 +718,11 @@ namespace SmiApi.Controllers
 
                 await using var cmd = _dataSource.CreateCommand(@"
                     UPDATE admin.subredes 
-                    SET id_cmts = $1, nombre = $2, cidr = network($3::inet), gateway = $4::inet, tipo = $5, descripcion = $6
-                    WHERE id = $7
+                    SET id_cmts = $1, id_bundle = $2, nombre = $3, cidr = network($4::inet), gateway = $5::inet, tipo = $6, descripcion = $7
+                    WHERE id = $8
                     RETURNING id;");
                 cmd.Parameters.AddWithValue(dto.IdCmts);
+                cmd.Parameters.AddWithValue((object?)dto.IdBundle ?? DBNull.Value);
                 cmd.Parameters.AddWithValue(dto.Nombre.Trim());
                 cmd.Parameters.AddWithValue(dto.Cidr.Trim());
                 cmd.Parameters.AddWithValue(dto.Gateway.Trim());
@@ -855,7 +986,7 @@ namespace SmiApi.Controllers
                 clientClassesArray.Add(new System.Text.Json.Nodes.JsonObject
                 {
                     ["name"] = "docsis_modems",
-                    ["test"] = "substring(option[60].hex, 0, 6) == 0x646f63736973 or substring(option[60].hex, 0, 6) == 0x444f43534953"
+                    ["test"] = "substring(option[60].hex, 0, 12) == 0x646f63736973 or substring(option[60].hex, 0, 12) == 0x444f43534953 or substring(option[60].text, 0, 6) == 'docsis' or substring(option[60].text, 0, 6) == 'DOCSIS'"
                 });
 
                 int leaseTimeSeconds = 86400;
@@ -899,24 +1030,21 @@ namespace SmiApi.Controllers
                             ["name"] = className
                         };
 
-                        if (className.Equals("dhcp-cpe-nat", StringComparison.OrdinalIgnoreCase))
-                        {
-                            classObj["test"] = "member('KNOWN') and not member('docsis_modems')";
-                        }
-
                         clientClassesArray.Add(classObj);
                     }
 
-                    // Cargar subredes físicas con información de su CMTS
+                    // Cargar subredes físicas con información de su CMTS y Bundle
                     await using (var cmdSubredes = new Npgsql.NpgsqlCommand(@"
-                        SELECT s.id, s.cidr::text, s.gateway::text, s.tipo, s.nombre, s.id_cmts, c.nombre AS cmts_nombre
+                        SELECT s.id, s.cidr::text, s.gateway::text, s.tipo, s.nombre, s.id_cmts, c.nombre AS cmts_nombre,
+                               s.id_bundle, b.nombre AS bundle_nombre, host(b.ip_giaddr) AS ip_giaddr
                         FROM admin.subredes s
                         JOIN admin.cmts c ON s.id_cmts = c.id
+                        LEFT JOIN admin.bundles b ON s.id_bundle = b.id
                         ORDER BY s.id;", connection))
                     {
                         await using (var readerSubredes = await cmdSubredes.ExecuteReaderAsync())
                         {
-                            var subredes = new List<(int Id, string Cidr, string Gateway, string Tipo, string Nombre, int IdCmts, string CmtsNombre)>();
+                            var subredes = new List<(int Id, string Cidr, string Gateway, string Tipo, string Nombre, int IdCmts, string CmtsNombre, int? IdBundle, string? BundleNombre, string? IpGiaddr)>();
                             while (await readerSubredes.ReadAsync())
                             {
                                 subredes.Add((
@@ -926,12 +1054,15 @@ namespace SmiApi.Controllers
                                     readerSubredes.GetString(3),
                                     readerSubredes.GetString(4),
                                     readerSubredes.GetInt32(5),
-                                    readerSubredes.GetString(6)
+                                    readerSubredes.GetString(6),
+                                    readerSubredes.IsDBNull(7) ? (int?)null : readerSubredes.GetInt32(7),
+                                    readerSubredes.IsDBNull(8) ? null : readerSubredes.GetString(8),
+                                    readerSubredes.IsDBNull(9) ? null : readerSubredes.GetString(9)
                                 ));
                             }
                             readerSubredes.Close();
 
-                            var cpeGroups = new Dictionary<int, (string CmtsNombre, List<System.Text.Json.Nodes.JsonObject> Subnets)>();
+                            var bundleGroups = new Dictionary<string, (string BundleNombre, List<System.Text.Json.Nodes.JsonObject> Subnets)>();
 
                             foreach (var sub in subredes)
                             {
@@ -993,7 +1124,7 @@ namespace SmiApi.Controllers
                                 // Si la subred es de tipo 'CM' (Gestión de Cablemódems), inyectamos automáticamente las opciones de infraestructura TFTP y ToD
                                 if (sub.Tipo.Equals("CM", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    string infraServerIp = Environment.GetEnvironmentVariable("INFRA_SERVER_IP") ?? "192.168.2.106";
+                                    string infraServerIp = Environment.GetEnvironmentVariable("INFRA_SERVER_IP") ?? "192.168.2.20";
                                     subnetObj["next-server"] = infraServerIp;
                                     subnetObj["server-hostname"] = infraServerIp;
 
@@ -1018,42 +1149,47 @@ namespace SmiApi.Controllers
                                 }
 
                                 subnetObj["option-data"] = optionArray;
+                                subnetObj["reservations-global"] = true;
+                                subnetObj["reservations-in-subnet"] = true;
 
-                                if (sub.Tipo.Equals("CM", StringComparison.OrdinalIgnoreCase))
+                                // Agrupar por Bundle si posee IP giaddr definida
+                                if (!string.IsNullOrEmpty(sub.IpGiaddr))
                                 {
-                                    globalSubnets.Add(subnetObj);
-                                }
-                                else // tipo == "CPE"
-                                {
-                                    if (!cpeGroups.ContainsKey(sub.IdCmts))
+                                    string groupKey = sub.IpGiaddr;
+                                    string bName = sub.BundleNombre ?? $"bundle-{sub.IdBundle}";
+
+                                    if (!bundleGroups.ContainsKey(groupKey))
                                     {
-                                        cpeGroups[sub.IdCmts] = (sub.CmtsNombre, new List<System.Text.Json.Nodes.JsonObject>());
+                                        bundleGroups[groupKey] = (bName, new List<System.Text.Json.Nodes.JsonObject>());
                                     }
-                                    cpeGroups[sub.IdCmts].Subnets.Add(subnetObj);
+                                    bundleGroups[groupKey].Subnets.Add(subnetObj);
+                                }
+                                else
+                                {
+                                    // Subred plana global en Kea
+                                    globalSubnets.Add(subnetObj);
                                 }
                             }
 
-                            // Agrupar en shared-networks solo si hay más de una subred CPE en un mismo CMTS
-                            foreach (var group in cpeGroups)
+                            // Agrupar subredes del mismo Bundle en shared-networks con relay agent (giaddr)
+                            foreach (var group in bundleGroups)
                             {
-                                if (group.Value.Subnets.Count > 1)
+                                var sharedObj = new System.Text.Json.Nodes.JsonObject
                                 {
-                                    var sharedObj = new System.Text.Json.Nodes.JsonObject
+                                    ["name"] = $"shared-{group.Value.BundleNombre.ToLower().Replace(" ", "-")}",
+                                    ["relay"] = new System.Text.Json.Nodes.JsonObject
                                     {
-                                        ["name"] = $"shared-{group.Value.CmtsNombre.ToLower().Replace(" ", "-")}",
-                                        ["subnet4"] = new System.Text.Json.Nodes.JsonArray()
-                                    };
-                                    foreach (var sObj in group.Value.Subnets)
-                                    {
-                                        sharedObj["subnet4"]!.AsArray().Add(sObj);
-                                    }
-                                    sharedNetworksArray.Add(sharedObj);
-                                }
-                                else if (group.Value.Subnets.Count == 1)
+                                        ["ip-addresses"] = new System.Text.Json.Nodes.JsonArray { group.Key }
+                                    },
+                                    ["subnet4"] = new System.Text.Json.Nodes.JsonArray()
+                                };
+                                sharedObj["reservations-global"] = true;
+                                sharedObj["reservations-in-subnet"] = true;
+                                foreach (var sObj in group.Value.Subnets)
                                 {
-                                    // Si hay una sola subred CPE para el CMTS, la dejamos plana en subnet4
-                                    globalSubnets.Add(group.Value.Subnets[0]);
+                                    sharedObj["subnet4"]!.AsArray().Add(sObj);
                                 }
+                                sharedNetworksArray.Add(sharedObj);
                             }
                         }
                     }
@@ -1073,6 +1209,9 @@ namespace SmiApi.Controllers
                 var identifiersArray = new System.Text.Json.Nodes.JsonArray { "hw-address", "flex-id" };
                 configNode["Dhcp4"]!["host-reservation-identifiers"] = identifiersArray;
                 configNode["Dhcp4"]!["store-extended-info"] = true;
+                configNode["Dhcp4"]!["early-global-reservations-lookup"] = true;
+                configNode["Dhcp4"]!["reservations-lookup-first"] = true;
+                configNode["Dhcp4"]!["match-client-id"] = false;
 
                 // Copia de seguridad por si falla la recarga caliente de Kea
                 string backupPath = configPath + ".bak";
@@ -1090,61 +1229,76 @@ namespace SmiApi.Controllers
                 };
                 var updatedConfigText = System.Text.Json.JsonSerializer.Serialize(configNode, options);
 
-                await System.IO.File.WriteAllTextAsync(tempPath, updatedConfigText);
-                System.IO.File.Move(tempPath, configPath, overwrite: true);
-                Console.WriteLine("[SDN SUCCESS] Archivo kea-dhcp4.conf regenerado de forma atómica.");
+                await System.IO.File.WriteAllTextAsync(configPath, updatedConfigText);
+                Console.WriteLine("[SDN SUCCESS] Archivo kea-dhcp4.conf actualizado directamente in-place.");
 
                 // 5. Llamada REST de recarga en caliente (Config Reload) a kea-ctrl-agent en el puerto 8001
-                using (var httpClient = new System.Net.Http.HttpClient())
+                try
                 {
-                    var payload = new
+                    using (var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(3) })
                     {
-                        command = "config-reload",
-                        service = new[] { "dhcp4" }
-                    };
-                    var content = new System.Net.Http.StringContent(
-                        System.Text.Json.JsonSerializer.Serialize(payload),
-                        System.Text.Encoding.UTF8
-                    );
-                    content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
-
-                    var response = await httpClient.PostAsync("http://127.0.0.1:8001/", content);
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        if (System.IO.File.Exists(backupPath))
+                        var payload = new
                         {
-                            System.IO.File.Copy(backupPath, configPath, overwrite: true);
+                            command = "config-reload",
+                            service = new[] { "dhcp4" }
+                        };
+                        var content = new System.Net.Http.StringContent(
+                            System.Text.Json.JsonSerializer.Serialize(payload),
+                            System.Text.Encoding.UTF8
+                        );
+                        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+
+                        string keaAgentUrl = Environment.GetEnvironmentVariable("KEA_CTRL_AGENT_URL") ?? "http://isp-kea-dhcp:8001/";
+                        HttpResponseMessage response;
+                        try
+                        {
+                            response = await httpClient.PostAsync(keaAgentUrl, content);
                         }
-                        throw new Exception($"El Agente de Control Kea no respondió correctamente (Código HTTP {response.StatusCode}). Se restauró la configuración anterior.");
-                    }
-
-                    var responseBody = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"[SDN INFO] Comando de recarga enviado. Respuesta cruda: {responseBody}");
-
-                    using (var jsonDoc = System.Text.Json.JsonDocument.Parse(responseBody))
-                    {
-                        var root = jsonDoc.RootElement;
-                        if (root.ValueKind == System.Text.Json.JsonValueKind.Array && root.GetArrayLength() > 0)
+                        catch
                         {
-                            var firstResponse = root[0];
-                            int resultCode = firstResponse.GetProperty("result").GetInt32();
-                            string resultText = firstResponse.GetProperty("text").GetString() ?? "";
-
-                            if (resultCode != 0)
+                            response = await httpClient.PostAsync("http://127.0.0.1:8001/", content);
+                        }
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            if (System.IO.File.Exists(backupPath))
                             {
-                                // Restaurar backup si falla la recarga semántica de Kea
-                                if (System.IO.File.Exists(backupPath))
+                                System.IO.File.Copy(backupPath, configPath, overwrite: true);
+                            }
+                            throw new Exception($"El Agente de Control Kea no respondió correctamente (Código HTTP {response.StatusCode}). Se restauró la configuración anterior.");
+                        }
+
+                        var responseBody = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"[SDN INFO] Comando de recarga enviado. Respuesta cruda: {responseBody}");
+
+                        using (var jsonDoc = System.Text.Json.JsonDocument.Parse(responseBody))
+                        {
+                            var root = jsonDoc.RootElement;
+                            if (root.ValueKind == System.Text.Json.JsonValueKind.Array && root.GetArrayLength() > 0)
+                            {
+                                var firstResponse = root[0];
+                                int resultCode = firstResponse.GetProperty("result").GetInt32();
+                                string resultText = firstResponse.GetProperty("text").GetString() ?? "";
+
+                                if (resultCode != 0)
                                 {
-                                    System.IO.File.Copy(backupPath, configPath, overwrite: true);
+                                    // Restaurar backup si falla la recarga semántica de Kea
+                                    if (System.IO.File.Exists(backupPath))
+                                    {
+                                        System.IO.File.Copy(backupPath, configPath, overwrite: true);
+                                    }
+                                    throw new Exception($"Kea rechazó la recarga de configuración: {resultText}. Se restauró la configuración anterior.");
                                 }
-                                throw new Exception($"Kea rechazó la recarga de configuración: {resultText}. Se restauró la configuración anterior.");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"[SDN SUCCESS] Kea recargó la configuración exitosamente: {resultText}");
+                                else
+                                {
+                                    Console.WriteLine($"[SDN SUCCESS] Kea recargó la configuración exitosamente: {resultText}");
+                                }
                             }
                         }
                     }
+                }
+                catch (System.Net.Http.HttpRequestException httpEx)
+                {
+                    Console.WriteLine($"[SDN WARNING] No se pudo comunicar con kea-ctrl-agent en 127.0.0.1:8001 ({httpEx.Message}). El archivo kea-dhcp4.conf fue actualizado localmente.");
                 }
             }
             catch (Exception ex)

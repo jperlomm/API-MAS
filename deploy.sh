@@ -64,8 +64,8 @@ EOF
   fi
 "
 
-# Paso 3: Recompilación y Despliegue del Contenedor de Producción
-echo -e "\n${YELLOW}🚀 Paso 3: Reconstruyendo imágenes y levantando servicios en Docker...${NC}"
+# Paso 3: Recompilación y Despliegue de Servicios
+echo -e "\n${YELLOW}🚀 Paso 3: Ejecutando despliegue de componentes...${NC}"
 
 if [ "$SERVICE" = "all" ]; then
     echo -e "${CYAN}🤖 Procesando AMBOS servicios en caliente: web-client y admin-api...${NC}"
@@ -76,9 +76,19 @@ elif [ "$SERVICE" = "api" ]; then
 elif [ "$SERVICE" = "web" ]; then
     echo -e "${CYAN}🌐 Procesando únicamente el Frontend: web-client...${NC}"
     ssh "$SERVER_USER@$SERVER_IP" "cd $REMOTE_DIR && docker compose build web-client && docker compose up -d web-client"
+elif [ "$SERVICE" = "db" ]; then
+    echo -e "${CYAN}🗄️ Actualizando funciones trigger de la base de datos PostgreSQL en caliente...${NC}"
+    ssh "$SERVER_USER@$SERVER_IP" "
+      if docker ps | grep -q isp-postgres; then
+        docker exec -i isp-postgres psql -U postgres -d dhcp < $REMOTE_DIR/postgres/initdb/06_bundles_schema.sql
+        echo '✅ Trigger sync_servicio_to_kea_hosts actualizado exitosamente en la base de datos.'
+      else
+        echo '❌ El contenedor isp-postgres no está en ejecución en el servidor.'
+      fi
+    "
 else
     echo -e "${RED}❌ ERROR: El parámetro '$SERVICE' no es válido.${NC}"
-    echo -e "Uso del script: ./deploy.sh [all | api | web]"
+    echo -e "Uso del script: ./deploy.sh [all | api | web | db]"
     exit 1
 fi
 

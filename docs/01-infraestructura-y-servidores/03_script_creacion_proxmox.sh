@@ -32,7 +32,7 @@ if [ -z "$VM_ID" ] || [ -z "$VM_IP" ] || [ -z "$VM_GW" ] || [ -z "$VM_PASS" ]; t
 fi
 
 TEMPLATE_ID="9000"
-STORAGE_POOL="local-lvm"
+STORAGE_POOL="local-zfs"
 VM_NAME="spi-prod-vm"
 
 echo -e "${CYAN}=========================================================================${NC}"

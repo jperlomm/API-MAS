@@ -37,17 +37,17 @@ qm create 9000 \
 
 ### 3. Importar la imagen descargada al pool de almacenamiento de Proxmox (ej: `local-lvm`)
 ```bash
-qm importdisk 9000 debian-12-generic-amd64.qcow2 local-lvm
+qm importdisk 9000 debian-12-generic-amd64.qcow2 local-zfs
 ```
 
 ### 4. Adjuntar el disco importado a la VM como `scsi0` y activar soporte SSD/Discard (TRIM)
 ```bash
-qm set 9000 --scsi0 local-lvm:vm-9000-disk-0,discard=on,ssd=1
+qm set 9000 --scsi0 local-zfs:vm-9000-disk-0,discard=on,ssd=1
 ```
 
 ### 5. Añadir la controladora virtual Cloud-Init
 ```bash
-qm set 9000 --ide2 local-lvm:cloudinit
+qm set 9000 --ide2 local-zfs:cloudinit
 ```
 
 ### 6. Configurar orden de arranque (Boot Order) para iniciar desde `scsi0`

@@ -20,7 +20,7 @@ CREATE EXTENSION IF NOT EXISTS postgres_fdw;
 DROP SERVER IF EXISTS legacy_server CASCADE;
 CREATE SERVER legacy_server
     FOREIGN DATA WRAPPER postgres_fdw
-    OPTIONS (host '192.168.2.106', port '5435', dbname 'spi_legacy');
+    OPTIONS (host '192.168.2.20', port '5435', dbname 'spi_legacy');
 
 -- Crear el mapeo de usuarios (Usa las credenciales 'postgres' / 'P0stgr3s_legacy_pwd' de tu sandbox)
 DROP USER MAPPING IF EXISTS FOR postgres SERVER legacy_server;

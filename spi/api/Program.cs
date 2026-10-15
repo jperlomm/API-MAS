@@ -285,7 +285,7 @@ using (var scope = app.Services.CreateScope())
             ON CONFLICT (clave) DO NOTHING;
 
             INSERT INTO admin.configuraciones (clave, valor, descripcion) VALUES
-            ('infra_server_ip', '192.168.2.106', 'Dirección IP del servidor de infraestructura local para TFTP y ToD')
+            ('infra_server_ip', '192.168.2.20', 'Dirección IP del servidor de infraestructura local para TFTP y ToD')
             ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor;
 
             -- Soportar múltiples domicilios agregando dirección de instalación al servicio
@@ -448,14 +448,22 @@ using (var scope = app.Services.CreateScope())
                     END IF;
                 END IF;
 
-                -- 2. Limpieza de RESERVAS en public.hosts
+                -- 2. Limpieza Absoluta de RESERVAS previa en public.hosts
                 IF v_old_mac_bytes IS NOT NULL THEN
                     DELETE FROM public.hosts WHERE dhcp_identifier = v_old_mac_bytes;
                 END IF;
-                
-                -- Limpieza de seguridad rápida y segura por texto en user_context para evitar excepciones de casteo JSON
-                DELETE FROM public.hosts 
-                WHERE user_context LIKE '%""servicio_id"": ' || COALESCE(OLD.id, NEW.id) || '%';
+
+                IF v_new_mac_bytes IS NOT NULL THEN
+                    DELETE FROM public.hosts WHERE dhcp_identifier = v_new_mac_bytes;
+                END IF;
+
+                IF OLD.id IS NOT NULL THEN
+                    DELETE FROM public.hosts WHERE user_context IS NOT NULL AND user_context <> '' AND (user_context::jsonb->>'servicio_id')::int = OLD.id;
+                END IF;
+
+                IF NEW.id IS NOT NULL THEN
+                    DELETE FROM public.hosts WHERE user_context IS NOT NULL AND user_context <> '' AND (user_context::jsonb->>'servicio_id')::int = NEW.id;
+                END IF;
 
                 -- 2.1 [SOPORTE INTELIGENTE DE LEASES]
                 -- ÚNICAMENTE borramos leases si el servicio se elimina, se suspende, o si el hardware cambió físicamente.
@@ -506,115 +514,44 @@ using (var scope = app.Services.CreateScope())
                 FROM admin.paquetes 
                 WHERE id = NEW.id_paquete;
 
-                -- [CMTS NULL - MULTI-SUBNET PRE-PROVISIONING]
-                -- Si el CMTS es NULL, pre-creamos reservas temporales para todas las subredes CM/CPE activas del sistema.
-                -- Esto permite que Kea resuelva la reserva en cualquier subred física donde encienda el módem.
-                IF NEW.id_cmts IS NULL THEN
-                    FOR v_rec IN 
-                        SELECT s1.id as subnet_cm, s2.id as subnet_cpe, s1.id_cmts
-                        FROM admin.subredes s1
-                        LEFT JOIN admin.subredes s2 ON s2.id_cmts = s1.id_cmts AND s2.tipo = 'CPE'
-                        WHERE s1.tipo = 'CM'
-                    LOOP
-                        -- Registrar Cablemodem (Tipo 0) de forma temporal para esta subred
-                        INSERT INTO public.hosts (dhcp_identifier, dhcp_identifier_type, dhcp4_subnet_id, ipv4_address, dhcp4_client_classes, dhcp4_boot_file_name, dhcp4_next_server, user_context)
-                        VALUES (
-                            v_new_mac_bytes, 
-                            0, 
-                            v_rec.subnet_cm,
-                            NULL, -- IP dinámica para autodetección
-                            'docsis_modems',
-                            v_bootfile,
-                            (v_server_ip_inet - '0.0.0.0'::inet),
-                            jsonb_build_object(
-                                'tipo', 'Cablemodem',
-                                'servicio_id', NEW.id,
-                                'cliente_id', NEW.id_cliente,
-                                'cmts_id', NULL -- Marcador de pre-aprovisionamiento
-                            )
-                        ) RETURNING host_id INTO v_host_id_cm;
-
-                        -- Inyectar Opción 67 (Bootfile)
-                        IF v_bootfile IS NOT NULL AND v_bootfile <> '' THEN
-                            INSERT INTO public.dhcp4_options (code, value, formatted_value, space, scope_id, host_id, persistent)
-                            VALUES (
-                                67, 
-                                v_bootfile::bytea, 
-                                v_bootfile, 
-                                'dhcp4',
-                                3, 
-                                v_host_id_cm,
-                                true
-                            );
-                        END IF;
-
-                        -- Registrar CPE (Tipo 4) de forma temporal para esta subred
-                        IF v_rec.subnet_cpe IS NOT NULL THEN
-                            INSERT INTO public.hosts (dhcp_identifier, dhcp_identifier_type, dhcp4_subnet_id, ipv4_address, dhcp4_client_classes, user_context)
-                            VALUES (
-                                v_new_mac_bytes, 
-                                4, 
-                                v_rec.subnet_cpe,
-                                NULL, -- IP dinámica para autodetección
-                                v_pack_class, 
-                                jsonb_build_object(
-                                    'tipo', 'CPE',
-                                    'servicio_id', NEW.id,
-                                    'cliente_id', NEW.id_cliente,
-                                    'cmts_id', NULL -- Marcador de pre-aprovisionamiento
-                                )
-                            );
-                        END IF;
-                    END LOOP;
-
-                    -- Actualizar el estado del equipo a ACTIVO
-                    UPDATE admin.equipos SET estado = 'ACTIVO' WHERE id = NEW.id_equipo;
-                    RETURN NEW;
+                -- Búsqueda de Subred CM (Cablemódem)
+                IF NEW.id_bundle IS NOT NULL THEN
+                    SELECT id INTO v_subnet_id_cm FROM admin.subredes WHERE id_bundle = NEW.id_bundle AND tipo = 'CM' LIMIT 1;
+                ELSIF NEW.id_cmts IS NOT NULL THEN
+                    SELECT id INTO v_subnet_id_cm FROM admin.subredes WHERE id_cmts = NEW.id_cmts AND tipo = 'CM' LIMIT 1;
                 END IF;
 
-                -- [CMTS DEFINITIVO - RESERVA FIJA ESTÁNDAR]
-                -- Obtener los IDs de subred correspondientes al CMTS del cliente para CM y CPE
-                SELECT id INTO v_subnet_id_cm 
-                FROM admin.subredes 
-                WHERE id_cmts = NEW.id_cmts AND tipo = 'CM' 
-                LIMIT 1;
-
-                -- Seleccionar la subred de CPE adecuada. Si tiene IP fija, buscamos la subred que contenga dicha IP.
-                IF NEW.ip_cpe IS NOT NULL THEN
-                    SELECT id INTO v_subnet_id_cpe 
-                    FROM admin.subredes 
-                    WHERE id_cmts = NEW.id_cmts AND tipo = 'CPE' AND NEW.ip_cpe <<= cidr
-                    LIMIT 1;
-                END IF;
-
-                -- Si no tiene IP fija, buscamos la subred de CPE que tenga un pool dinámico asociado a la clase de este plan
-                IF v_subnet_id_cpe IS NULL THEN
+                -- Búsqueda de Subred CPE: Vinculación por Bundle/CMTS y Clase DHCP del Paquete (v_pack_class)
+                IF NEW.id_bundle IS NOT NULL AND v_pack_class IS NOT NULL AND v_pack_class <> '' THEN
                     SELECT s.id INTO v_subnet_id_cpe
                     FROM admin.subredes s
                     JOIN admin.pools p ON p.id_subred = s.id
-                    WHERE s.id_cmts = NEW.id_cmts 
-                      AND s.tipo = 'CPE' 
-                      AND p.client_class = v_pack_class
-                      AND COALESCE(p.es_estatico, FALSE) = FALSE
+                    WHERE s.id_bundle = NEW.id_bundle AND s.tipo = 'CPE' AND p.client_class = v_pack_class
+                    LIMIT 1;
+                ELSIF NEW.id_cmts IS NOT NULL AND v_pack_class IS NOT NULL AND v_pack_class <> '' THEN
+                    SELECT s.id INTO v_subnet_id_cpe
+                    FROM admin.subredes s
+                    JOIN admin.pools p ON p.id_subred = s.id
+                    WHERE s.id_cmts = NEW.id_cmts AND s.tipo = 'CPE' AND p.client_class = v_pack_class
                     LIMIT 1;
                 END IF;
 
-                -- Fallback de seguridad (tomar la primera CPE por defecto)
-                IF v_subnet_id_cpe IS NULL THEN
+                -- Si el servicio asigna una IP CPE estática explícita, buscar por CIDR
+                IF v_subnet_id_cpe IS NULL AND NEW.ip_cpe IS NOT NULL THEN
                     SELECT id INTO v_subnet_id_cpe 
                     FROM admin.subredes 
-                    WHERE id_cmts = NEW.id_cmts AND tipo = 'CPE' 
+                    WHERE tipo = 'CPE' AND NEW.ip_cpe <<= cidr
                     LIMIT 1;
                 END IF;
 
-                -- Registrar Cablemodem (Tipo 0) definitivo
+                -- 5. Registrar Cablemodem (Tipo 0 - hw-address)
                 v_ip_cm_int := CASE WHEN NEW.ip_cm IS NOT NULL THEN (NEW.ip_cm - '0.0.0.0'::inet) ELSE NULL END;
                 
                 INSERT INTO public.hosts (dhcp_identifier, dhcp_identifier_type, dhcp4_subnet_id, ipv4_address, dhcp4_client_classes, dhcp4_boot_file_name, dhcp4_next_server, user_context)
                 VALUES (
                     v_new_mac_bytes, 
                     0, 
-                    v_subnet_id_cm,
+                    COALESCE(v_subnet_id_cm, 0),
                     v_ip_cm_int,
                     'docsis_modems',
                     v_bootfile,
@@ -623,11 +560,12 @@ using (var scope = app.Services.CreateScope())
                         'tipo', 'Cablemodem',
                         'servicio_id', NEW.id,
                         'cliente_id', NEW.id_cliente,
-                        'cmts_id', NEW.id_cmts
+                        'cmts_id', NEW.id_cmts,
+                        'bundle_id', NEW.id_bundle
                     )
                 ) RETURNING host_id INTO v_host_id_cm;
 
-                -- Inyectar el BOOTFILE (Opción 67) definitivo
+                -- Inyectar BOOTFILE (Opción 67)
                 IF v_bootfile IS NOT NULL AND v_bootfile <> '' THEN
                     INSERT INTO public.dhcp4_options (code, value, formatted_value, space, scope_id, host_id, persistent)
                     VALUES (
@@ -641,25 +579,26 @@ using (var scope = app.Services.CreateScope())
                     );
                 END IF;
 
-                -- Registrar CPE del Cliente (Tipo 4) definitivo
+                -- 6. Registrar CPE del Cliente (Tipo 4 - flex-id para Option 82 Remote-ID)
                 v_ip_cpe_int := CASE WHEN NEW.ip_cpe IS NOT NULL THEN (NEW.ip_cpe - '0.0.0.0'::inet) ELSE NULL END;
                 
                 INSERT INTO public.hosts (dhcp_identifier, dhcp_identifier_type, dhcp4_subnet_id, ipv4_address, dhcp4_client_classes, user_context)
                 VALUES (
                     v_new_mac_bytes, 
                     4, -- flex-id (Option 82 Remote-ID)
-                    v_subnet_id_cpe,
+                    COALESCE(v_subnet_id_cpe, 0),
                     v_ip_cpe_int,
                     v_pack_class, 
                     jsonb_build_object(
                         'tipo', 'CPE',
                         'servicio_id', NEW.id,
                         'cliente_id', NEW.id_cliente,
-                        'cmts_id', NEW.id_cmts
+                        'cmts_id', NEW.id_cmts,
+                        'bundle_id', NEW.id_bundle
                     )
                 );
 
-                -- Actualizar el estado del equipo a ACTIVO
+                -- 7. Actualizar el estado del equipo
                 UPDATE admin.equipos SET estado = 'ACTIVO' WHERE id = NEW.id_equipo;
 
                 RETURN NEW;
@@ -722,10 +661,10 @@ using (var scope = app.Services.CreateScope())
 
         string infraServerIp = Environment.GetEnvironmentVariable("INFRA_SERVER_IP") 
             ?? detectedIp 
-            ?? "192.168.2.106";
+            ?? "192.168.2.20";
 
         Console.WriteLine($"[STARTUP] IP de Infraestructura Detectada Automáticamente: {infraServerIp}");
-        cmd.CommandText = cmd.CommandText.Replace("'192.168.2.106'", $"'{infraServerIp}'");
+        cmd.CommandText = cmd.CommandText.Replace("'192.168.2.106'", $"'{infraServerIp}'").Replace("'192.168.2.20'", $"'{infraServerIp}'");
 
         cmd.Parameters.AddWithValue("admin_hash", adminPasswordHash);
         await cmd.ExecuteNonQueryAsync();
